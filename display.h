@@ -1,5 +1,12 @@
-// display board buffers
-// low level functions
+/* *** Gottileb System 80/B SIM PRB ***
+* (SIMulation Pinball Replacement control Board)
+* software for Teensy 3.x board developed with Arduino IDE
+* under GNU General Public Livence v3
+* ---
+* DISPLAY LIBRARY
+* ---
+* Display buffers and basic output functions.
+*/
 
 #define CMD_BUF_LEN 20
 #define DISPLAY_COLS 20
@@ -12,6 +19,7 @@
 #define CD_START_SCAN  0x0e
 #define CD_DUTY_CYCLE  0x40 // OR 0..3F (6 LSB)
 #define CD_DIGIT_CNT   0x80 // OR 0..1F (5 LSB)
+#define CD_BUF_PTR     0x80 // char pointer = lower 5 bits
 
 #define setOverWriteMode(m) overWriteMode = m
 #define writeDisplayChar(r,c,a) txtBuff[r & 1][c % DISPLAY_COLS] = a
@@ -22,12 +30,12 @@
 #define putDotAt(r,c) txtBuff[r & 1][c % DISPLAY_COLS] |= 0x80
 
 const byte displayInitSequence[] = { // display init sequence (after reset)
-  CD_DIGIT_CNT, 20, 
-  CD_DUTY_CYCLE, 0x20, 
-  CD_NORMAL_MODE, 
-  CD_START_SCAN, 
-  0xff};
-  
+  CD_DIGIT_CNT, 20,
+  CD_DUTY_CYCLE, 0x20,
+  CD_NORMAL_MODE,
+  CD_START_SCAN,
+  0xff }; // end of sequence
+
 char txtBuff[2][DISPLAY_COLS+1];
 bool dVisible[2];
 uint16_t cmdBuff[CMD_BUF_LEN];
@@ -44,6 +52,9 @@ void clearDisplayRow(byte row);
 void writeDisplayText(byte row, const char *text);
 void writeDisplayText(byte row, const char *text, short int offset);
 void writeDisplayText(byte row, byte col, const char *text);
+void writeDisplayText(byte row, String text);
+void writeDisplayText(byte row, String text, short int offset);
+void writeDisplayText(byte row, byte col, String text);
 void displayScrollLeft(byte row);
 void displayScrollRight(byte row);
 void displayRotateLeft(byte row);
@@ -52,10 +63,11 @@ void displayShiftUp();
 void displayShiftDown();
 void dPushCmd(byte ld, byte cmd);
 uint16_t getNextDisplayData();
+void pushByteOnDisplayRows();
 
 void initDisplay() {
   byte i, c;
-  
+
   txtBuff[0][DISPLAY_COLS] = 0;
   txtBuff[1][DISPLAY_COLS] = 0;
   resetDispl();
@@ -77,6 +89,7 @@ void resetDispl() {
   dRow = 0; // current display row
   dVisible[0] = true;
   dVisible[1] = true;
+  dPushCmd(3, CD_BUF_PTR);
 }
 
 void clearDispl() {
@@ -86,7 +99,7 @@ void clearDispl() {
 
 void clearDisplayRow(byte row) {
   int i;
-  
+
   row &= 1;
   for (i=0; i<DISPLAY_COLS; i++) txtBuff[row][i] = ' ';
 }
@@ -100,7 +113,7 @@ void writeDisplayText(byte row, const char *text) {
 // with offset > 0 = text starts after first display char (right)
 void writeDisplayText(byte row, const char *text, short int offset) {
   if (offset >= 0) { // right
-    if (offset >= DISPLAY_COLS) return; 
+    if (offset >= DISPLAY_COLS) return;
     writeDisplayText(row, (byte)offset, text);
   }
   else { // offset < 0  = left
@@ -111,7 +124,7 @@ void writeDisplayText(byte row, const char *text, short int offset) {
 
 void writeDisplayText(byte row, byte col, char *text) {
   int i = 0;
-  
+
   row = row & 1;
   col = col % DISPLAY_COLS;
   while (col < DISPLAY_COLS && text[i] != 0) txtBuff[row][col++] = text[i++];
@@ -119,11 +132,23 @@ void writeDisplayText(byte row, byte col, char *text) {
 
 void writeDisplayText(byte row, byte col, const char *text) {
   int i = 0;
-  
+
   row = row & 1;
   col = col % DISPLAY_COLS;
   if (!overWriteMode) clearDisplayRow(row);
   while (col < DISPLAY_COLS && text[i] != 0) txtBuff[row][col++] = text[i++];
+}
+
+void writeDisplayText(byte row, String text) {
+  writeDisplayText(row, text.c_str());
+}
+
+void writeDisplayText(byte row, String text, short int offset) {
+  writeDisplayText(row, text.c_str(), offset);
+}
+
+void writeDisplayText(byte row, byte col, String text) {
+  writeDisplayText(row, col, text.c_str());
 }
 
 // scrolls text 1 char left
@@ -149,7 +174,7 @@ void displayRotateRight(byte row) {
   char c;
   c = txtBuff[row][DISPLAY_COLS-1];
   displayScrollRight(row);
-  txtBuff[row][0] = c;  
+  txtBuff[row][0] = c;
 }
 
 void displayShiftUp() {
@@ -168,7 +193,7 @@ void displayShiftDown() {
 
 void dPushCmd(byte ld, byte cmd) {
   byte ptr;
-  
+
   if (cmdBufLen >= CMD_BUF_LEN) return; // refused
   ptr = (cmdBufPtr + cmdBufLen) % CMD_BUF_LEN;
   cmdBuff[ptr] = 0x0400 | (((uint16_t)(ld & 0x03))<<8) | cmd;
@@ -183,7 +208,7 @@ void dPushCmd(byte ld, byte cmd) {
 // at least LD1 or LD2 (or Reset) should be set for any effect
 uint16_t getNextDisplayData() {
   uint16_t r = 0; // return value
-  
+
   if (cmdBufLen > 0) { // pending command ?
     r = cmdBuff[cmdBufPtr++];
     if (cmdBufPtr == CMD_BUF_LEN) cmdBufPtr = 0;
@@ -196,9 +221,29 @@ uint16_t getNextDisplayData() {
   if (++dRow > 1) {
     dRow = 0;
     dCol++;
-    if (dCol == DISPLAY_COLS) dCol = 0;
+    if (dCol == DISPLAY_COLS) {
+      dPushCmd(3, CD_BUF_PTR); // CR on both lines
+      dCol = 0;
+    }
   }
   return r;
 }
 
+void pushByteOnDisplayRows() {
+  uint16_t dd;
 
+  dd = getNextDisplayData(); // row 0
+  writeDisplayData((byte)(dd & 0xff));
+  writeDisplayCtrl((byte)((dd & 0x700)>>8));
+  delayMicroseconds(10);
+  writeDisplayCtrl(0); // resets LD1, LD2
+
+  if (dd & 0x0300 == 0x0300) return; // CMD for both lines has already been sent
+
+  delayMicroseconds(100);
+  dd = getNextDisplayData(); // row1
+  writeDisplayData((byte)(dd & 0xff));
+  writeDisplayCtrl((byte)((dd & 0x700)>>8));
+  delayMicroseconds(10);
+  writeDisplayCtrl(0); // resets LD1, LD2
+}

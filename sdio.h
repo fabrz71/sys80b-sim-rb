@@ -1,3 +1,12 @@
+/* *** Gottileb System 80/B SIM PRB ***
+* (SIMulation Pinball Replacement control Board)
+* software for Teensy 3.x board developed with Arduino IDE
+* under GNU General Public Livence v3
+* ---
+* SD CARD I/O
+* ---
+* Basic I/O functions for SD card.
+*/
 // microSD R/W functions
 
 #include <SD.h>
@@ -22,7 +31,7 @@ boolean initSD(int sd_pin) {
 boolean loadRAM(byte m[], char *fileName) {
   File f;
   long i, fsz;
-  
+
   Serial.print(F("Loading RAM '"));
   Serial.print(fileName);
   Serial.print("'... ");
@@ -70,4 +79,3 @@ boolean updateRAM(byte m[], char *fileName) {
   else Serial.println("ok.");
   return true;
 }
-

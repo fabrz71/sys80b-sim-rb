@@ -1,4 +1,13 @@
-// low level functions for MAX7219 LED matrix driver 
+/* *** Gottileb System 80/B SIM PRB ***
+* (SIMulation Pinball Replacement control Board)
+* software for Teensy 3.x board developed with Arduino IDE
+* under GNU General Public Livence v3
+* ---
+* LED MATRIX DRIVER
+* ---
+* Low level functions for MAX7219 LED matrix driver 
+*/
+
 #include <SPI.h>
 
 #define LGR_SPI_CLK 1000000
@@ -51,5 +60,3 @@ void setLGintens(byte i) {
 void clearLGgrid() {
   for (byte i=0; i<8; i++) setLedRow(i, 0);
 }
-
-

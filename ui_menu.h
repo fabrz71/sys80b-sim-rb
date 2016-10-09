@@ -1,3 +1,13 @@
+/* *** Gottileb System 80/B SIM PRB ***
+* (SIMulation Pinball Replacement control Board)
+* software for Teensy 3.x board developed with Arduino IDE
+* under GNU General Public Livence v3
+* ---
+* SYSTEM/80B MENU USER INTERFACE
+* ---
+* Pinball menu user interface implementation.
+*/
+
 // User Interface Menu
 
 #include <string.h>
@@ -58,7 +68,7 @@ const menuItem noYesItems[] = {
       { F("NO (DISABLED)"), NULL, 0, false },
       { F("YES (ENABLED)"), NULL, 0, false },
       _M_END };
-    
+
 const menuItem specialItems[] = {
       { F("SPECIAL"), NULL, 0, false },
       { F("EXTRA BALL"), NULL, 0, false },
@@ -68,12 +78,12 @@ const menuItem ballsItems[] = {
       { F("3 BALLS"), NULL, 0, false },
       { F("5 BALLS"), NULL, 0, false },
       _M_END };
- 
+
 const menuItem captBallItems[] = {
       { F("RETURNED AFTER EACH BALL"), NULL, 0, false },
       { F("RETAINED AFTER EACH BALL"), NULL, 0, false },
       _M_END };
-      
+
 const menuItem replayItems[] = {
       { F("UNLIMITED"), NULL, 0, false },
       { F("ONCE ONLY"), NULL, 0, false },
@@ -94,10 +104,10 @@ const menuItem hsRewardItems[] = {
       { F("1 REPLAY"), NULL, 0, false },
       { F("2 REPLAY"), NULL, 0, false },
       { F("3 REPLAY"), NULL, 0, false },
-      _M_END };  
+      _M_END };
 
 // TOP LEVEL MENUS
-    
+
 const menuItem pinTestsMenu[] = { // pinball tests menu
       { F("LAMPS TEST"), _dynamicItems, 0x21, false },
       { F("SPECIAL LAMPS TEST"), _dynamicItems, 0x22, false },
@@ -106,7 +116,7 @@ const menuItem pinTestsMenu[] = { // pinball tests menu
       { F("SWITCHES TEST"), NULL, 0x25, false },
       { F("DISPLAY TEST"), NULL, 0x26, false },
       _M_END };
-      
+
 const menuItem bookkMenu[] = { // bookkeeping menu
       { F("LEFT CHUTE COINS"), NULL, 0x31, false },
       { F("CENTER CHUTE COINS"), NULL, 0x32, false },
@@ -123,21 +133,21 @@ const menuItem bookkMenu[] = { // bookkeeping menu
       { F("THIRD HIGH SCORE LEVEL"), NULL, 0x3d, false },
       { F("HIGHEST SCORE"), NULL, 0x3e, false },
       { F("AVERAGE PLAYING TIME"), NULL, 0x3f, false },
-      _M_END };      
-      
+      _M_END };
+
 const menuItem prbTestsItems[] = { // PRB tests menu
       { F("RETURNS TEST"), NULL, 0x41, false },
       { F("DIGITAL OUTPUTS TEST"), NULL, 0x42, false },
       { F("DIGITAL INPUTS TEST"), NULL, 0x43, false },
       { F("LED GRID TEST"), NULL, 0x44, false },
       _M_END };
-  
+
 const menuItem prbSettItems[] = { // PRB settings menu
       { F("ACTIVITY OUTPUT"), NULL, 0x51, false },
       { F("GAME INFO"), NULL, 0x52, false },
       { F("PRB VERSION"), NULL, 0x53, false },
       _M_END };
-          
+
 const menuItem pinSettMenu[] = { // pinball settings menu
       { F("LEFT COINS/CREDIT"), _dynamicItems, 0x11, true },
       { F("CENTER COINS/CREDIT"), _dynamicItems, 0x12, true },
@@ -155,7 +165,7 @@ const menuItem pinSettMenu[] = { // pinball settings menu
       { F("GAME MODE"), gameModeItems, 0x1e, true },
       { F("3RD COIN CHUTE CTRL"), _3rdCoinCtrlItems, 0x1f, true },
       _M_END };
-      
+
 const menuItem mainMenu[] = { // main menu
     { F("PINBALL SETTINGS"), pinSettMenu, 1, false },
     { F("PINBALL TESTS"), pinTestsMenu, 2, false},
@@ -163,7 +173,7 @@ const menuItem mainMenu[] = { // main menu
     { F("PRB TESTS"), prbTestsItems, 4, false },
     { F("PRB SETTINGS"), prbSettItems, 5, false },
     _M_END };
-      
+
 void initMenu() {
   _home();
   _menuTaskExecution = false;
@@ -240,7 +250,7 @@ void _menuForward(bool rememberPath) {
 
 void _menuBack() {
   byte i;
-  
+
   if (mdepth < 1) return;
   mdepth--;
   // restore upper menu
@@ -265,7 +275,7 @@ void _updMenuDisplay() {
 
 byte _getSettingsItem(byte iid) {
   byte r;
-  
+
   switch (iid) {
     case 0x11: // left coin chute
     case 0x12: // center coin chute
@@ -298,7 +308,7 @@ byte _getSettingsItem(byte iid) {
     case 0x1f:
       r = getSettingSwitch(iid+15);
       break;
-    default: 
+    default:
       r = 0xff; // null value
       break;
   }
@@ -345,7 +355,7 @@ void _setSettingsItem(byte iid, byte val) {
 
 void _doMenuItem(byte iid, byte val) {
   uint16_t res;
-  
+
   // SIMPLE SETTINGS
   if (iid >= 0x11 && iid <= 0x1f) {
     settVal = val;
@@ -388,7 +398,7 @@ void _doMenuItem(byte iid, byte val) {
         res = getStat16(2 + (itemId-0x31)*2);
         break;
       case 0x3a: // times highest game to date awarded
-        res = getStat8(20); 
+        res = getStat8(20);
         break;
       case 0x3b: // 1st high score level
       case 0x3c: // 2nd high score level
@@ -415,7 +425,7 @@ char *_getSpecialItemName(byte &mid, byte &n) {
   switch (mid) {
     case 0x11: // credits/coins settings
     case 0x12:
-    case 0x13: 
+    case 0x13:
       if (n > 24) n = 0;
       sprintf(mbuf, "%d CREDITS / %d COINS", credits_ratio[n], coins_ratio[n]);
       break;
@@ -448,4 +458,3 @@ char *_getSpecialItemName(byte &mid, byte &n) {
   }
   return mbuf;
 }
-

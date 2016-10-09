@@ -1,4 +1,13 @@
-// Display special effects (high level)
+/* *** Gottileb System 80/B SIM PRB ***
+* (SIMulation Pinball Replacement control Board)
+* software for Teensy 3.x board developed with Arduino IDE
+* under GNU General Public Livence v3
+* ---
+* DISPLAY SPECIAL EFFECTS
+* ---
+* Display Extention library for special effects.
+*/
+
 #include "TimerTask.h"
 #include <string.h>
 
@@ -25,7 +34,7 @@ struct DisplayLine {
     bool blinkState; // cycle phase (on/off)
     uint32_t blinkEnableTime;
     uint16_t blinkActivePeriod;
-    byte blinkStartCol; // first blinking char 
+    byte blinkStartCol; // first blinking char
     byte blinkEndCol; // last blinking char
     char blinkStr[TXT_MAX_LEN+1]; // alternate string for line blinking
     TimerTask *blink_timer;
@@ -80,12 +89,12 @@ void setDisplayText(byte line, const char *text, byte effect) {
   setDisplayText(line, text);
   enableDisplayEffect(line, effect);
 }
- 
+
 void enableDisplayEffect(byte line, byte effectId) {
   byte fxv = 0; // effect variable
   short int off = 0; // string offset
   uint16_t fxd = STD_DFX_DELAY; // effect delay
-  
+
   line &= 1;
   if (effectId == DISPL_SHOW_EFF && dLine[line].msgLen <= DISPLAY_COLS)
     effectId = DISPL_NO_EFF;
@@ -141,7 +150,7 @@ void _stepDisplayEffect(byte line) {
   bool fxEnd; // effect end reached
   byte len; // msg length
   short int off;
-  
+
   fxv = dLine[line].fxVar;
   off = dLine[line].chOffset;
   fxEnd = false;
@@ -247,7 +256,7 @@ void _dBlinkSwitch(byte line) {
 void _updBlinkedTxt(byte line, byte startCh, byte endCh) {
   char *oc, *dc;
   byte i, l;
-  
+
   l = dLine[line].msgLen;
   if (startCh >= l || endCh < startCh) return;
   if (endCh >= l) endCh = l-1;
@@ -264,4 +273,3 @@ void updateDisplayLine(byte line) {
   else st = dl.msg;
   writeDisplayText(line, st, dl.chOffset);
 }
-

@@ -1,4 +1,15 @@
-// low level I/O functions for MCP24S17 GPIO expanders
+/* *** Gottileb System 80/B SIM PRB ***
+* (SIMulation Pinball Replacement control Board)
+* software for Teensy 3.x board developed with Arduino IDE
+* under GNU General Public Livence v3
+* ---
+* LOW LEVEL I/O
+* ---
+* Low level I/O functions for MCP24S17 GPIO expanders.
+* MCP24S17 IC offers two 8-bit I/O ports and it's controlled
+* by Teensy through SPI interface.
+*/
+
 #include <SPI.h>
 
 #define MCP_SPI_CLK 1000000 // hz
@@ -60,11 +71,11 @@ void byteWrite(uint8_t adr, uint8_t reg, uint8_t value) {      // Accept the reg
   MCP_SPI_CS_ON;                                 // Slave Select HIGH after SPI action
 }
 
-// GENERIC WORD WRITE - will write a word to a register pair, LSB to first register, MSB to next higher value register 
-void wordWrite(uint8_t adr, uint8_t reg, uint16_t value) {  // Accept the start register and word 
-  MCP_SPI_CS_OFF;                               // Slave Select LOW before SPI action 
+// GENERIC WORD WRITE - will write a word to a register pair, LSB to first register, MSB to next higher value register
+void wordWrite(uint8_t adr, uint8_t reg, uint16_t value) {  // Accept the start register and word
+  MCP_SPI_CS_OFF;                               // Slave Select LOW before SPI action
   SPI.transfer(OPCODEW | (adr << 1));             // Send the MCP23S17 opcode, chip address, and write bit
-  SPI.transfer(reg);                                   // Send the register we want to write 
+  SPI.transfer(reg);                                   // Send the register we want to write
   SPI.transfer((uint8_t) (value & 0xff));                      // Send the low byte (register address pointer will auto-increment after write)
   SPI.transfer((uint8_t) (value >> 8));                 // Shift the high byte down to the low byte location and send
   MCP_SPI_CS_ON;                                 // Slave Select HIGH after SPI action
@@ -84,11 +95,11 @@ void pinDirection(uint8_t adr, uint16_t mode) {    // Accept the word…
   wordWrite(adr, IODIRA, mode);                // Call the the generic word writer with start register and the mode cache
 }
 
-void pullupMode(uint8_t adr, uint16_t mode) { 
+void pullupMode(uint8_t adr, uint16_t mode) {
   wordWrite(adr, GPPUA, mode);
 }
 
-void inputInvert(uint8_t adr, uint16_t mode) { 
+void inputInvert(uint8_t adr, uint16_t mode) {
   wordWrite(adr, IPOLA, mode);
 }
 
@@ -123,28 +134,27 @@ byte mcpReadPB(uint8_t adr) {       // This function will read 8 bits of I/O
   return value;                             // Return the byte
 }
 
-void mcpWrite(uint8_t adr, uint16_t value) { 
-  MCP_SPI_CS_OFF;                               // Slave Select LOW before SPI action 
+void mcpWrite(uint8_t adr, uint16_t value) {
+  MCP_SPI_CS_OFF;                               // Slave Select LOW before SPI action
   SPI.transfer(OPCODEW | (adr << 1));             // Send the MCP23S17 opcode, chip address, and write bit
-  SPI.transfer(GPIOA);                                   // Send the register we want to write 
+  SPI.transfer(GPIOA);                                   // Send the register we want to write
   SPI.transfer((uint8_t) (value & 0xff));                      // Send the low byte (register address pointer will auto-increment after write)
   SPI.transfer((uint8_t) (value >> 8));                 // Shift the high byte down to the low byte location and send
   MCP_SPI_CS_ON;                                 // Slave Select HIGH after SPI action
 }
 
-void mcpWritePA(uint8_t adr, uint8_t value) { 
-  MCP_SPI_CS_OFF;                               // Slave Select LOW before SPI action 
+void mcpWritePA(uint8_t adr, uint8_t value) {
+  MCP_SPI_CS_OFF;                               // Slave Select LOW before SPI action
   SPI.transfer(OPCODEW | (adr << 1));             // Send the MCP23S17 opcode, chip address, and write bit
-  SPI.transfer(GPIOA);                                   // Send the register we want to write 
-  SPI.transfer(value); 
+  SPI.transfer(GPIOA);                                   // Send the register we want to write
+  SPI.transfer(value);
   MCP_SPI_CS_ON;                                 // Slave Select HIGH after SPI action
 }
 
-void mcpWritePB(uint8_t adr, uint8_t value) { 
-  MCP_SPI_CS_OFF;                               // Slave Select LOW before SPI action 
+void mcpWritePB(uint8_t adr, uint8_t value) {
+  MCP_SPI_CS_OFF;                               // Slave Select LOW before SPI action
   SPI.transfer(OPCODEW | (adr << 1));             // Send the MCP23S17 opcode, chip address, and write bit
-  SPI.transfer(GPIOB);                                   // Send the register we want to write 
-  SPI.transfer(value);                      
+  SPI.transfer(GPIOB);                                   // Send the register we want to write
+  SPI.transfer(value);
   MCP_SPI_CS_ON;                                 // Slave Select HIGH after SPI action
 }
-

@@ -1,4 +1,13 @@
-// fundamental Programmer Interface
+/* *** Gottileb System 80/B SIM PRB ***
+* (SIMulation Pinball Replacement control Board)
+* software for Teensy 3.x board developed with Arduino IDE
+* under GNU General Public Livence v3
+* ---
+* FUNDAMENTAL PROGRAMMER INTERFACE
+* ---
+* Basic pinball I/O functions for:
+* lamps, displays, solenoids, sound, switches.
+*/
 
 //#include <LiquidCrystal.h>
 #include <LiquidCrystalFast.h>
@@ -8,7 +17,7 @@
 
 #define DEF_BLINK_TIME 500
 #define SW_ONOFF_MIN_TIME 50
-#define SNDBUFF_LEN 10 
+#define SNDBUFF_LEN 10
 #define SNDCMD_TIME 100
 
 #define writeSound(b)  mcpWritePB(3, b)
@@ -26,17 +35,17 @@
 //PROGMEM const char *inpName[] = { "RETURNS" , "SLAM SWITCH" };
 //PROGMEM const char *outpName[] = { "STROBES", "SOLENOIDS", "SOUND", "LAMPS", "DISPLAY" };
 
-PROGMEM byte displayInitSeq[] = { 
-  CD_DIGIT_CNT | DISPLAY_COLS, 
-  CD_DUTY_CYCLE | 0x20, 
-  CD_NORMAL_MODE, 
-  CD_START_SCAN, 
+PROGMEM byte displayInitSeq[] = {
+  CD_DIGIT_CNT | DISPLAY_COLS,
+  CD_DUTY_CYCLE | 0x20,
+  CD_NORMAL_MODE,
+  CD_START_SCAN,
   0 };
 
 PROGMEM const uint16_t mux16[16] = // 16 bit mux outputs
   { 0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080,
     0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000 };
-    
+
 enum inputType { RETURNS, SLAM_SW };
 enum outputType { STROBES, SOLENOIDS, SOUND, LAMPS, DISPL };
 
@@ -44,6 +53,9 @@ extern const byte D_LD1_PIN;
 extern const byte D_LD2_PIN;
 extern const byte D_RES_PIN;
 extern const byte SLAM_PIN;
+extern const byte special_lamp[];
+extern const byte special_lamp_count;
+extern const uint16_t solMaxOnTime[];
 
 // single solenoid state
 struct Solenoid {
@@ -115,11 +127,13 @@ void initAPI() {
   for (i=0; displayInitSeq[i] != 0; i++) dPushCmd(3, displayInitSeq[i]);
 }
 
-// note: 
+// note:
 // n = [1..9] standard solenoid
+// n = [10..15] no effect
 // n = [16..32] "lamp" solenoid 0..15
 void setSolenoid(byte n, bool active) {
   if (n < 1 || n > 32) return;
+  if (n > 9 && n < 16) return;
   solen[n].state = active;
   solen[n].newState = active;
   if (active) solen[n].activationTime = millis();
@@ -161,7 +175,7 @@ void resetSolenoids() {
 // set a lamp on or off, with status memory
 void setLamp(byte n, bool state) {
   byte b, set;
-  
+
   if (n > 47) return;
   set = n / 4;
   b = 1 << (n % 4);
@@ -261,14 +275,14 @@ bool readMatrixSw(byte col, byte row) {
   return ((ret & bit(row)) != 0);
 }
 
-// 1. reads returns on current strobe line 
+// 1. reads returns on current strobe line
 // 2. call special subroutine on any open/closed-switch event (with debounce effect)
 // 3. updates returns LED grid
 // 4. increments strobe line for next read
 void getNextReturns(uint32_t t) {
   byte i, ret, diff, b, ss, sw;
   byte stbx8;
-  
+
   ret = RETURNS();
   diff = ret ^ returns_latch[strobe]; // return byte changed bits
   if (diff) { // some change occurred
@@ -282,10 +296,10 @@ void getNextReturns(uint32_t t) {
           lastSwitchClosed = sw;
           lastSwitchClosedTime[i] = t;
           onEvent(sw, true);
-          returns_latch[strobe] = ret; 
+          returns_latch[strobe] = ret;
         }
         else { // switch has opened
-          if (lastSwitchClosed == i && 
+          if (lastSwitchClosed == i &&
               t - lastSwitchClosedTime[i] >= SW_ONOFF_MIN_TIME) { // debounce condition
             onEvent(sw, false);
             returns_latch[strobe] = ret;
@@ -302,7 +316,7 @@ void getNextReturns(uint32_t t) {
 void checkSolenoids(uint32_t t) {
   uint16_t maxTime;
   Solenoid sol;
-  
+
   for (byte i=1; i<32; i++) {
     if (i >= 10 && i < 16) continue;
     sol = solen[i];
@@ -325,7 +339,7 @@ void checkSolenoids(uint32_t t) {
 void checkSolenoids(uint32_t t) {
   uint16_t stdTime, maxTime;
   uint32_t dt;
-  
+
   for (byte i=1; i<32; i++) {
     if (i >= 10 && i < 16) continue;
     if (solen[i].active) { // solenoid activated?
@@ -348,8 +362,6 @@ bool isSpecialLamp(byte lamp) {
   return false;
 }
 
-// base I/O functions ----------------------------------------------------------------
-
 // bit 0: LD1 (active high)
 // bit 1: LD2 (active high)
 // bit 2: RESET (active low)
@@ -358,6 +370,3 @@ void writeDisplayCtrl(byte ctrl) {
   digitalWrite(D_LD2_PIN, ((ctrl & 2) != 0) ? HIGH : LOW);
   digitalWrite(D_RES_PIN, ((ctrl & 4) != 0) ? HIGH : LOW);
 }
-
-
-
