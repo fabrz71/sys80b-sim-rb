@@ -1,24 +1,33 @@
-/* Gottileb System 80/B SIM PRB (SIMulation Pinball Replacement control Board)
+/* *** Gottileb System 80/B SIM PRB ***
+* (SIMulation Pinball Replacement control Board)
+* software for Teensy 3.x board developed with Arduino IDE
+* under GNU General Public Livence v3
 * ---
-* This software was developed under Arduino IDE for _Teensy 3.x_ boards. 
-* This software is part of "Sys80b SIM PRB" project which aims to design 
-* a programmable replacement control board for Gottlieb pinballs based on 
-* System 80/B. 
+* version 0.16.9
+* ---
+* MAIN SOURCE FILE
+* ---
+* Teensy board setup and main loop code.
+* ---
+* This software is part of "Sys80b SIM PRB" project which aims to design
+* a programmable replacement control board for Gottlieb pinballs based on
+* System 80/B.
 * For more informations see project overview document.
 */
 
-#include <SPI.h>
-#include <LiquidCrystalFast.h>
-#include <Bounce.h>
-#include <SD.h>
-#include <EEPROM.h>
-#include "pinSpecific.h" // all pinball stuff starts from here
+#include <SPI.h> // Arduino SPI serial communication library
+#include <LiquidCrystalFast.h> // Teensy 3.x optimized library for LCD
+#include <Bounce.h> // contacts unbounce library
+#include <SD.h> // Arduino SD flash memory library
+#include <EEPROM.h> // Arduino EEPROM library
+#include "pinSpecific.h" // pinball generic functions code
 
 #define DEBOUNCE_T 200      // keys debounce threshold time
 #define LMP_TMR_PERIOD 40   // lamps update timer
 #define SOL_TMR_PERIOD 100  // solenoid update timer
-#define SND_TMR_PERIOD 50   // sound update timer period
+#define SND_TMR_PERIOD 40   // sound update timer period
 #define BAUDRATE 57600      // serial communication through USB
+#define BATCH_DELAY 1000    // batch loop duration
 
 // general pinball identification data
 #define PIN_BRAND "Gottlieb"
@@ -62,14 +71,14 @@ TimerTask *millis_tmr, *lamps_tmr, *sols_tmr, *snd_tmr;
 TimerSet tset;
 
 void setup() {
-  
+
   // Teensy I/O pins setup
   pinsSetup();
-  
+
   // Serial COM init
   Serial.begin(BAUDRATE);
   delay(1000);
-  
+
   // SPI init
   Serial.println(F("Starting SPI..."));
   SPI.begin();
@@ -79,7 +88,7 @@ void setup() {
   Serial.println(F("MCP init..."));
   MCP_init(GPIO_SS_PIN);
   delay(1000);
-  
+
   // LED grid init
   Serial.println(F("Led Grid init..."));
   initLedGrid(LG_SS_PIN);
@@ -90,7 +99,7 @@ void setup() {
   Serial.println(F("API init..."));
   initAPI();
   delay(1000);
-    
+
   Serial.println(F("OUTPUT tests..."));
   /* while (1) */ _outptest();
   delay(1000);
@@ -99,11 +108,11 @@ void setup() {
   Serial.println(F("Pinball init..."));
   initPinball();
   delay(1000);
-  
+
   // timers setup and function associations
   Serial.println(F("Timers init..."));
   millis_tmr = new TimerTask(millisRoutine, 1);
-  lamps_tmr = new TimerTask(checkLights, LMP_TMR_PERIOD);
+  lamps_tmr = new TimerTask(updateLamps, LMP_TMR_PERIOD);
   sols_tmr = new TimerTask(checkSolenoids, SOL_TMR_PERIOD);
   snd_tmr = new TimerTask(checkSoundCmd, SND_TMR_PERIOD);
   TimerSet tset;
@@ -111,7 +120,7 @@ void setup() {
   tset.add(lamps_tmr);
   tset.add(sols_tmr);
   tset.add(snd_tmr);
-  
+
   // Go!
   Serial.println(F("Go..."));
   lcd.clear();
@@ -121,7 +130,26 @@ void setup() {
 
 // top-most Teensy loop
 void loop() {
-  tset.checkTimerTasks();
+  uint32_t loopStartT, nextEventT; // [ms]
+  uint32_t cumWorkTime, batchT, t1, t2; // [us]
+  byte busy_perc; // [%]
+
+  while(1) {
+    cumWorkTime = 0;
+    batchT = BATCH_DELAY * 1000;
+    nextEventT = batchT;
+    loopStartT = millis();
+    do { // Batch loop
+      t1 = micros();
+      nextEventT = tset.checkTimerTasks();
+      t2 = micros();
+      cumWorkTime += (t2 - t1);
+      delay(nextEventT);
+    } while (millis() - loopStartT < BATCH_DELAY);
+    busy_perc = (byte)(((cumWorkTime * 100) / batchT) & 0xff);
+    Serial.print(busy_perc);
+    Serial.println("%");
+  };
 }
 
 // Teensy starting I/O pins setup
@@ -136,7 +164,7 @@ void pinsSetup() {
   pinMode(D_LD1_PIN, OUTPUT);
   pinMode(D_LD2_PIN, OUTPUT);
   pinMode(D_RES_PIN, OUTPUT);
-  
+
   digitalWrite(GPIO_SS_PIN, HIGH);
   digitalWrite(LG_SS_PIN, HIGH);
   digitalWrite(SD_SS_PIN, HIGH);
@@ -149,16 +177,12 @@ void pinsSetup() {
 void millisRoutine(uint32_t ms) {
   uint16_t dd;
   bool b;
-  
+
   // SWITCH GRID READING
   getNextReturns(ms);
-  
+
   // DISPLAY UPDATE
-  dd = getNextDisplayData();
-  writeDisplayData((byte)(dd & 0xff));
-  writeDisplayCtrl((byte)((dd & 0x700)>>8));
-  delayMicroseconds(10);
-  writeDisplayCtrl(0); // resets LD1, LD2
+  pushByteOnDisplayRows();
 
   // Debounced on-board buttons update
   b = nextButton.update();
@@ -183,7 +207,7 @@ void lcdprn(String st, byte line) {
 // (temporary) test routine for Teensy outputs
 void _outptest() {
   int i;
-  
+
   for (i=0; i<9; i++) {
     setSolenoid(i, true);
     delay(100);
@@ -217,4 +241,3 @@ void _outptest() {
   }
   clearLGgrid();
 }
-
