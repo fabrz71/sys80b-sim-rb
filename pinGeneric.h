@@ -9,13 +9,15 @@
 * fundamental for all games.
 */
 
-#include "ledGrid.h"
 #include "baseAPI.h"
+#include "ledGrid.h"
 #include "flashData.h"
 #include "displFX.h"
 #include "LightSet.h"
 #include "ui_menu.h"
-#include "timerTask.h"
+//#include "timerTask.h"
+#include "msgOutput.h"
+#include <MemoryFree.h>
 
 #define MAX_PLAYERS 4
 #define TOP_SCORES  5
@@ -36,7 +38,7 @@
 
 // standard "lamp" solenoids (controlled as lamps)
 const int RELAY_Q_SOL = 16;
-const int RELAY_T_SOL = 17; 
+const int RELAY_T_SOL = 17;
 const int BRELEASE_SOL = 18;
 const int SND16_SOL = 20;
 
@@ -84,6 +86,9 @@ bool tiltEnabled;
 Light light[LAMPS_COUNT];
 LightStage *lightStage;
 bool lightStageEnabled;
+TimerTask *gpTimer;// general purpose timer
+
+extern TimerSet *tset;
 
 void initPinball_generic();
 void initGame_generic();
@@ -95,7 +100,7 @@ void loadHighScores();
 void loadAwardScoreLevels();
 void loadCoinsPerCredits();
 void onCoinInserted(byte cch);
-void incrementPowerOnCounterStat();
+uint16_t incrementPowerOnCounterStat();
 void incrementCredits(byte cr);
 void incrementPlayers();
 void incrementBalls();
@@ -105,16 +110,30 @@ bool switchToNextPlayer();
 void tilt();
 void resetTilt();
 bool releaseBall();
+void setDelayedCall(func_t sub, uint32_t dlay);
+void setPeriodicCall(func_t sub, uint32_t period);
+void startGame(uint32_t t);
 
 extern void onEvent(byte sw);
 extern String getGameName();
+extern void startAttractMode();
+//extern void startGame();
+//extern void startBookkeepingMode();
+//extern void startTestMode();
 
 void initPinball_generic() {
   byte i;
 
+  writeDisplayAndSoundReset(true);
+  gpTimer = new TimerTask(NULL, 1000, "GPtmr");
+  gpTimer->disable();
+  tset->add(gpTimer);
   lightStage = new LightStage(light, LAMPS_COUNT);
   setActiveLightStage(lightStage);
-  incrementPowerOnCounterStat();
+  lightStageEnabled = true;
+  initDisplayFx();
+  Serial.print("Power on counter: ");
+  Serial.println(incrementPowerOnCounterStat());
   //loadStats();
   loadCoinsPerCredits();
   loadAwardScoreLevels();
@@ -124,9 +143,9 @@ void initPinball_generic() {
   defaultBallsPerPlay = (getSettingSwitch(25) == 1) ? 3 : 5;
   for (i=0; i<3; i++) coins[i] = 0; // coins reset
   for (i=0; i<MAX_PLAYERS; i++) player[i].score = 0; // scores reset
-  lightStageEnabled = true;
-  setPinMode(START_MODE);
+  writeDisplayAndSoundReset(false);
   setSolenoid(RELAY_Q_SOL, true); // game over
+  //setPinMode(START_MODE);
 }
 
 void initGame_generic() {
@@ -138,17 +157,21 @@ void initGame_generic() {
 
 void setPinMode(byte mode) {
   String s;
-  
+
+  Serial.print(F("Switching to mode "));
+  Serial.println(mode);
   pinballMode = mode;
   modeStep = 0;
   switch (pinballMode) {
     case START_MODE:
-      setDisplayText(0, (const char *) F("SYS80/B PRB 1.0 BY FABVOLPI@GMAIL.COM"));
-      s = String("PRESS START FOR *" + getGameName() + "*");
-      setDisplayText(1, s.c_str());
+      setDisplayText(0, (const char *) F("SYS80/B PRB V1.0 BY"));
+      setDisplayText(1, (const char *) F(" FABVOLPI@GMAIL.COM"));
+      setDelayedCall(startGame, 500); // switches to another state
+      tset->print();
       break;
     case ATTRACT_MODE:
-      displayScoresAndCredits();
+      clearDispl();
+      startAttractMode();
       // ...
       break;
     case GAME_MODE:
@@ -198,8 +221,8 @@ void loadHighScores() {
     else {
       topScore[i].score = (TOP_SCORES-i) * 500000u;
       topScore[i].initials[0] = 'R';
-      topScore[i].initials[1] = 'R';
-      topScore[i].initials[2] = 'R';
+      topScore[i].initials[1] = 'A';
+      topScore[i].initials[2] = 'M';
     }
   }
 }
@@ -231,10 +254,9 @@ void onCoinInserted(byte cch) {
     incrementCredits(ch_credits[cch]);
     coins[cch] = 0;
   }
-  // setSound( );
 }
 
-void incrementPowerOnCounterStat() {
+uint16_t incrementPowerOnCounterStat() {
   uint16_t pot;
   byte i;
 
@@ -244,6 +266,7 @@ void incrementPowerOnCounterStat() {
     for (i=0; i<76; i++) saveStat8(i, factoryStatsBytes[i]);
   }
   saveStat16(0, ++pot);
+  return pot;
 }
 
 void incrementCredits(byte cr) {
@@ -351,3 +374,28 @@ void updateLamps(uint32_t ms) {
   if (lightStageEnabled) lightStage->updateLights(ms, true);
   renderLamps();
 }
+
+void setDelayedCall(func_t sub, uint32_t dlay) {
+  gpTimer->disable();
+  Serial.print("Setting timer ");
+  gpTimer->print();
+  gpTimer->set(dlay, false);
+  gpTimer->setFunction(sub);
+  gpTimer->enable();
+  Serial.print("->");
+  gpTimer->print();
+  Serial.println();
+}
+
+void setPeriodicCall(func_t sub, uint32_t period) {
+  gpTimer->disable();
+  gpTimer->set(period, true);
+  gpTimer->setFunction(sub);
+  gpTimer->enable();
+}
+
+void startGame(uint32_t t) {
+  //Serial.println("startGame()");
+  setPinMode(ATTRACT_MODE);
+}
+

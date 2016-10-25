@@ -27,22 +27,37 @@ class TimerTask {
     uint32_t period; // time after activation before trigger
     bool oneShot; // not periodic
     bool enabled;
-    char *tag; // optional tag
+    const char *tag; // optional tag
     TimerTask *next; // optional other related timer
 
     TimerTask(func_t sub, uint32_t ms, bool periodic);
+    TimerTask(func_t sub, uint32_t ms, const char *name);
     inline void set(uint32_t ms, bool periodic) { period = ms; oneShot = !periodic; }
+    inline void setFunction(func_t sub) { funct = sub; }
     inline void enable() { start_time = millis(); enabled = true; }
     inline void disable() { enabled = false; }
     uint32_t check(uint32_t chkTime);
     uint32_t getRemainingTime(uint32_t chkTime = 0);
+    void print();
 };
 
 TimerTask::TimerTask(func_t sub, uint32_t ms, bool periodic = true) {
+  //Serial.println("Creating TimerTask... ");
   funct = sub;
   period = ms;
   oneShot = !periodic;
   enabled = false;
+  tag = "";
+  next = NULL;
+}
+
+TimerTask::TimerTask(func_t sub, uint32_t ms, const char *name) {
+  //Serial.println("Creating TimerTask... ");
+  funct = sub;
+  period = ms;
+  oneShot = false;
+  enabled = false;
+  if (name == NULL) tag = ""; else tag = name;
   next = NULL;
 }
 
@@ -68,13 +83,22 @@ uint32_t TimerTask::check(uint32_t chkTime = 0) {
 
 uint32_t TimerTask::getRemainingTime(uint32_t chkTime) {
   uint32_t elapsed;
-    
+
   if (!enabled) return 0;
   if (chkTime == 0) chkTime = millis();
   if (chkTime < start_time) elapsed = ~start_time + chkTime + 1;
   else elapsed = chkTime - start_time;
   if (elapsed >= period) return 0;
   return period - elapsed;
+}
+
+
+void TimerTask::print() {
+   Serial.print("['");
+   if (tag != NULL) Serial.print(tag);
+   Serial.print("',");
+   Serial.print(period);
+   if (enabled) Serial.print(",1]"); else Serial.print(",0]");
 }
 
 class TimerSet {
@@ -85,25 +109,39 @@ class TimerSet {
     uint32_t chkTime;
   public:
     bool add(TimerTask *tt);
-    bool remove(TimerTask *tt);
+    bool rmv(TimerTask *tt);
     bool contains(TimerTask *tt);
     uint32_t checkTimerTasks();
     inline byte getLength() { return t_counter; }
     void enableAllTimers();
     void disableAllTimers();
     //uint32_t getNextEventRemainingTime();
+    void print();
 };
 
 bool TimerSet::add(TimerTask *tt) {
-  if (t_counter >= MAX_TASKS-1) return false;
+  Serial.print("Adding timer... ");
+  if (tt == NULL) {
+    Serial.println("abort: can't add null timer!");
+    return false;
+  }
+  //tt->print();
+  if (t_counter >= MAX_TASKS-1) {
+    Serial.println("abort: max number of TimerTasks reached.");
+    return false;
+  }
   if (t_counter++ == 0) first_timer = tt;
   if (last_timer != NULL) last_timer->next = tt;
   last_timer = tt;
   tt->next = NULL;
+  Serial.print(" (");
+  Serial.print(t_counter);
+  Serial.println(")");
   return true;
 }
 
-bool TimerSet::remove(TimerTask *ttask) {
+// removes a timeTask object in the set
+bool TimerSet::rmv(TimerTask *ttask) {
   TimerTask *prevtt, *tt;
 
   if (t_counter == 0) return false; // empty list
@@ -138,7 +176,7 @@ bool TimerSet::contains(TimerTask *ttask) {
 uint32_t TimerSet::checkTimerTasks() {
   TimerTask *tt;
   uint32_t rt, nextEventT;
-  
+
   nextEventT = 60000;
   if (t_counter == 0) return 0;
   chkTime = millis();
@@ -167,7 +205,7 @@ void TimerSet::disableAllTimers() {
 uint32_t TimerSet::getNextEventRemainingTime() {
   TimerTask *tt;
   uint32_t now, dt, smallest;
-  
+
   if (t_counter == 0) return 1000;
   now = millis();
   for (tt = first_timer; tt != NULL; tt = tt->next) {
@@ -178,5 +216,22 @@ uint32_t TimerSet::getNextEventRemainingTime() {
 }
 */
 
-#endif // TimerTask_h
+void TimerSet::print() {
+  TimerTask *tt;
+  uint32_t nextEventT;
 
+  Serial.print("(");
+  Serial.print(t_counter);
+  Serial.print("):");
+  if (t_counter == 0) {
+    Serial.println("<no timers!>");
+    return;
+  }
+  chkTime = millis();
+  for (tt = first_timer; tt != NULL; tt = tt->next) {
+    tt->print();
+  }
+  Serial.println("_");
+}
+
+#endif // TimerTask_h

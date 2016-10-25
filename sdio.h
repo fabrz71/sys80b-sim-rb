@@ -10,7 +10,6 @@
 // microSD R/W functions
 
 #include <SD.h>
-//#include "/Applications/BONUS/Arduino.app/Contents/Java/hardware/teensy/avr/libraries/SD.h"
 
 boolean sdOk;
 

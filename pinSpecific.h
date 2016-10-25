@@ -96,12 +96,18 @@ PROGMEM const String solInfo[] = {
 // maximum active time for each solenoid [ms]
 const uint16_t solMaxOnTime[] =
   { 500, 500, 0, 0, 500, 500, 0, 500, 500 };
-  
+
 // convenience solenoids constants
 enum solenoid_ID {
   HOLE_SOL=1, LSHOOTER_SOL, LTOPDOME_SOL, RTOPDOME_SOL,
   RSHOOTER_SOL, BRESET_SOL, RDOME_SOL, KNOCKER_SOL, OUTHOLE_SOL,
   RAMP_SOL=28, BGATE_SOL, AUGER_SOL };
+
+// sound effects ##TODO##
+enum sound_ID { SND1=1, SND2, SND3, SND4, SND5, SND6, SND7, SND8,
+                SND9, SND10, SND11, SND12, SND13, SND14, SND15, SND16,
+                SND17, SND18, SND19, COIN_SND, SND21, SND22, SND23, SND24,
+                SND25, SND26, SND27, SND28, SND29, SND30, SND31, SND32 };
 
 // void string for unused switches in switch matrix
 #define NOSW (const char*)NULL
@@ -210,10 +216,11 @@ byte multiSeq;
 uint16_t bonusAdvanceSwitches;
 TimerTask *dropt_tmr, *lshow_tmr;
 byte multiplier[] = { 1, 2, 4, 8 };
-byte lightShowSeq, lightShowDelay;
+byte lightShowSeq;
+uint16_t lightShowDelay;
 bool lightShowOrder;
 
-extern TimerSet tset;
+//extern TimerSet *tset;
 
 // light sets - every set of light numbers MUST end with 0
 LightSet extraball_ls("extraball",    (const byte[]){ 5, 6, 7, 0 });
@@ -236,6 +243,7 @@ LightSet show6_ls("show6",            (const byte[]){ 3, 17, 42, 33, 0 });
 LightSet *lShow_ls[] = { &jail_ls, &wall_ls, &show1_ls, &show2_ls, &show3_ls, &show4_ls, &show5_ls, &show6_ls };
 
 void initPinball();
+void startAttractMode();
 void initGame();
 void initPlayer(); // TODO
 void onEvent(byte sw, bool st);
@@ -275,10 +283,16 @@ String getGameName();
 
 void initPinball() {
   initPinball_generic();
-  dropt_tmr = new TimerTask(dropTimerRoutine, DROPT_LIGHT_TMR1);
-  lshow_tmr = new TimerTask(lightShowCycle, 250);
-  tset.add(dropt_tmr);
-  tset.add(lshow_tmr);
+  dropt_tmr = new TimerTask(dropTimerRoutine, DROPT_LIGHT_TMR1, "Drop targets");
+  lshow_tmr = new TimerTask(lightShowCycle, 200, "Light show");
+  tset->add(dropt_tmr);
+  tset->add(lshow_tmr);
+}
+
+void startAttractMode() {
+  displayScoresAndCredits();
+  startLightShow();
+  //setTimerCall(updateAttractMode, 3000);
 }
 
 void initGame() {
@@ -293,14 +307,11 @@ void initGame() {
 }
 
 // EVENT DISPATCHER ROUTINE
-// sw = 0.63
+// sw = 0..63
 void onEvent(byte sw, bool st) {
   sw = (sw>>3)*10 + (sw & 7); // format conversion
   switches++;
   switch (pinballMode) {
-    case START_MODE:
-      if (sw == REPLAY_SW && st) setPinMode(ATTRACT_MODE);
-      break;
     case ATTRACT_MODE:
       if (sw == REPLAY_SW && st && credits > 0) {
         credits--;
@@ -602,12 +613,13 @@ void dropTimerRoutine(uint32_t ms) { // "light special" -> "100000x"
 
 void startLightShow() {
   lightShowSeq = 0;
-  lightShowDelay = 150; // ms
+  lightShowDelay = 200; // ms
   lightShowOrder = false;
   for (byte i=0; i<8; i++) {
     lShow_ls[i]->setAll(OFF_L);
     lShow_ls[i]->setL(0, ON_L);
   }
+  lshow_tmr->period = lightShowDelay;
   lshow_tmr->enable();
 }
 
@@ -616,6 +628,10 @@ void stopLightShow() {
 }
 
 void lightShowCycle(uint32_t ms) {
+  Serial.print("lightShowCycle: (");
+  Serial.print(ms);
+  Serial.println(") ");
+  //Serial.println(lightShowDelay);
   for (byte i=0; i<8; i++) {
     if (lightShowOrder) lShow_ls[i]->rotateLeft();
     else lShow_ls[i]->rotateRight();
@@ -623,12 +639,12 @@ void lightShowCycle(uint32_t ms) {
   if (++lightShowSeq >= 4) lightShowSeq = 0;
   if (lightShowSeq == 0) { // new sequence
     if (lightShowOrder) { // reverse direction
-      if (lightShowDelay <= 150) lightShowOrder = !lightShowOrder;
-      else lightShowDelay -= 10;
+      if (lightShowDelay <= 100) lightShowOrder = !lightShowOrder;
+      else lightShowDelay -= 20;
     }
     else { // forward direction
-      if (lightShowDelay > 250) lightShowOrder = !lightShowOrder;
-      else lightShowDelay += 10;
+      if (lightShowDelay >= 300) lightShowOrder = !lightShowOrder;
+      else lightShowDelay += 20;
     }
   }
   lshow_tmr->period = (uint32_t)lightShowDelay;

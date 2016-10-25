@@ -8,6 +8,8 @@
 * Display buffers and basic output functions.
 */
 
+#include "mcp_io.h"
+
 #define CMD_BUF_LEN 20
 #define DISPLAY_COLS 20
 
@@ -28,6 +30,9 @@
 #define getDisplayRowStr(r) String(txtBuff[r])
 #define getDisplayChar(r,c) txtBuff[r][c]
 #define putDotAt(r,c) txtBuff[r & 1][c % DISPLAY_COLS] |= 0x80
+#define writeDisplayData(b)  mcpWritePB(3, b)
+#define writeDisplayLD1(b)  digitalWrite(D_LD1_PIN, ((b) ? HIGH : LOW)
+#define writeDisplayLD2(b)  digitalWrite(D_LD2_PIN, ((b) ? HIGH : LOW)
 
 const byte displayInitSequence[] = { // display init sequence (after reset)
   CD_DIGIT_CNT, 20,
@@ -35,6 +40,9 @@ const byte displayInitSequence[] = { // display init sequence (after reset)
   CD_NORMAL_MODE,
   CD_START_SCAN,
   0xff }; // end of sequence
+
+extern const byte D_LD1_PIN;
+extern const byte D_LD2_PIN;
 
 char txtBuff[2][DISPLAY_COLS+1];
 bool dVisible[2];
@@ -232,18 +240,22 @@ uint16_t getNextDisplayData() {
 void pushByteOnDisplayRows() {
   uint16_t dd;
 
+  // FIRST OR BOTH DISPLAYS
   dd = getNextDisplayData(); // row 0
   writeDisplayData((byte)(dd & 0xff));
-  writeDisplayCtrl((byte)((dd & 0x700)>>8));
+  digitalWrite(D_LD1_PIN, ((dd & 0x100)>0) ? HIGH : LOW);
+  digitalWrite(D_LD2_PIN, ((dd & 0x200)>0) ? HIGH : LOW);
   delayMicroseconds(10);
-  writeDisplayCtrl(0); // resets LD1, LD2
-
-  if (dd & 0x0300 == 0x0300) return; // CMD for both lines has already been sent
-
+  digitalWrite(D_LD1_PIN, LOW);
+  digitalWrite(D_LD2_PIN, LOW);
+  
+  if ((dd & 0x0300) == 0x0300) return; // CMD for both lines has already been sent
   delayMicroseconds(100);
-  dd = getNextDisplayData(); // row1
+
+  // SECOND DISPLAY  
+  dd = getNextDisplayData(); // row 1
   writeDisplayData((byte)(dd & 0xff));
-  writeDisplayCtrl((byte)((dd & 0x700)>>8));
+  digitalWrite(D_LD2_PIN, HIGH);
   delayMicroseconds(10);
-  writeDisplayCtrl(0); // resets LD1, LD2
+  digitalWrite(D_LD2_PIN, LOW);
 }

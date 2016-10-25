@@ -10,6 +10,9 @@
 * by Teensy through SPI interface.
 */
 
+#ifndef Mcp_io
+#define Mcp_io
+
 #include <SPI.h>
 
 #define MCP_SPI_CLK 1000000 // hz
@@ -25,7 +28,7 @@
 #define OPCODEW     0b01000000  // Opcode for MCP23S17 with LSB (bit0) set to write (0), address OR'd in later, bits 1-3
 #define OPCODER     0b01000001  // Opcode for MCP23S17 with LSB (bit0) set to read (1), address OR'd in later, bits 1-3
 
-#define MCP_SPI_CS_OFF SPI.beginTransaction(mcpSpiSetup); digitalWrite(mcp_ss_pin, LOW); delay(1);
+#define MCP_SPI_CS_OFF SPI.beginTransaction(mcpSpiSetup); digitalWrite(mcp_ss_pin, LOW);
 #define MCP_SPI_CS_ON  digitalWrite(mcp_ss_pin, HIGH); SPI.endTransaction()
 
 int mcp_ss_pin;
@@ -52,14 +55,20 @@ void MCP_init(int pin) {
   byteWrite(0, IOCON, ADDR_ENABLE);
   // Ports data direction
   wordWrite(0, IODIRA, 0x0000); // all 16 pins set as output
+  mcpWrite(0, 0); // resets MCP0 outputs
   wordWrite(1, IODIRA, 0x0000); // all 16 pins set as output
+  mcpWrite(1, 0); // resets MCP1 outputs
   wordWrite(2, IODIRA, 0x00ff); // 8 bits output + 8 bits input
+  mcpWritePA(2, 0); // resets MCP2 outputs
   wordWrite(3, IODIRA, 0x0000); // all 16 pins set as output
+  mcpWrite(3, 0); // resets MCP3 outputs
+  /*
   // Outputs reset
   mcpWrite(0, 0); // resets MCP0 outputs
   mcpWrite(1, 0); // resets MCP1 outputs
   mcpWritePA(2, 0); // resets MCP2 outputs
   mcpWrite(3, 0); // resets MCP3 outputs
+  */
 }
 
 // GENERIC BYTE WRITE - will write a byte to a register, arguments are register address and the value to write
@@ -158,3 +167,5 @@ void mcpWritePB(uint8_t adr, uint8_t value) {
   SPI.transfer(value);
   MCP_SPI_CS_ON;                                 // Slave Select HIGH after SPI action
 }
+
+#endif

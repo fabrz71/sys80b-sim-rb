@@ -41,7 +41,7 @@ struct DisplayLine {
 };
 
 DisplayLine dLine[2];
-extern TimerSet tset;
+extern TimerSet *tset;
 
 void initDisplayFx();
 void setDisplayText(byte line, const char *text);
@@ -66,14 +66,14 @@ void updateDisplayLine(byte line);
 
 void initDisplayFx() {
   // effects timers
-  dLine[0].fx_timer = new TimerTask(_stepFx0, STD_DFX_DELAY);
-  dLine[1].fx_timer = new TimerTask(_stepFx1, STD_DFX_DELAY);
+  dLine[0].fx_timer = new TimerTask(_stepFx0, STD_DFX_DELAY, "R0 displFX");
+  dLine[1].fx_timer = new TimerTask(_stepFx1, STD_DFX_DELAY, "R1 displFX");
   // blink timers
-  dLine[0].blink_timer = new TimerTask(_dBlink0, STD_DFX_DELAY);
-  dLine[1].blink_timer = new TimerTask(_dBlink1, STD_DFX_DELAY);
+  dLine[0].blink_timer = new TimerTask(_dBlink0, STD_DFX_DELAY, "R0 displBlink");
+  dLine[1].blink_timer = new TimerTask(_dBlink1, STD_DFX_DELAY, "R1 displBlink");
   for (byte i=0; i<=1; i++) {
-    tset.add(dLine[i].fx_timer);
-    tset.add(dLine[i].blink_timer);
+    tset->add(dLine[i].fx_timer);
+    tset->add(dLine[i].blink_timer);
   }
 }
 

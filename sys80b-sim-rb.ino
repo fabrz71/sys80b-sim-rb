@@ -3,7 +3,7 @@
 * software for Teensy 3.x board developed with Arduino IDE
 * under GNU General Public Livence v3
 * ---
-* version 0.16.9
+* version 0.16.10
 * ---
 * MAIN SOURCE FILE
 * ---
@@ -15,19 +15,15 @@
 * For more informations see project overview document.
 */
 
-#include <SPI.h> // Arduino SPI serial communication library
-#include <LiquidCrystalFast.h> // Teensy 3.x optimized library for LCD
 #include <Bounce.h> // contacts unbounce library
-#include <SD.h> // Arduino SD flash memory library
-#include <EEPROM.h> // Arduino EEPROM library
 #include "pinSpecific.h" // pinball generic functions code
 
 #define DEBOUNCE_T 200      // keys debounce threshold time
-#define LMP_TMR_PERIOD 40   // lamps update timer
+#define LMP_TMR_PERIOD 50   // lamps update timer
 #define SOL_TMR_PERIOD 100  // solenoid update timer
-#define SND_TMR_PERIOD 40   // sound update timer period
+#define SND_TMR_PERIOD 50   // sound update timer period
 #define BAUDRATE 57600      // serial communication through USB
-#define BATCH_DELAY 1000    // batch loop duration
+#define BATCH_DELAY 1000    // batch loop duration (ms)
 
 // general pinball identification data
 #define PIN_BRAND "Gottlieb"
@@ -41,114 +37,151 @@ const byte BACKB_PIN = 5; // INPUT PULLUP, active high - "Back" control button
 const byte SD_SS_PIN = 10; // OUTPUT, active low - SPI SD select
 const byte GPIO_SS_PIN = 14; // OUTPUT, active low - baseAPI.h - SPI GPIO select
 const byte LG_SS_PIN = 15; // OUTPUT, active low - ledGrid.h - SPI Led Grid select
-const byte LCD_D4_PIN = 20; // OUTPUT - display data bits..
-const byte LCD_D5_PIN = 21;
-const byte LCD_D6_PIN = 22;
-const byte LCD_D7_PIN = 23;
-const byte LCD_RS_PIN = 8; // OUTPUT - display reset
-const byte LCD_EN_PIN = 9; // OUTPUT - display enable
 const byte D_LD1_PIN = 16; // OUTPUT, active high - pinball display 1 select
 const byte D_LD2_PIN = 17; // OUTPUT, active high - pinball display 2 select
 const byte D_RES_PIN = 18; // OUTPUT, active high - pinball displays reset
+const byte LCD_D4_PIN = 23; // OUTPUT - LCD display data bits..
+const byte LCD_D5_PIN = 22;
+const byte LCD_D6_PIN = 21;
+const byte LCD_D7_PIN = 20;
+const byte LCD_RW_PIN = 6; // OUTPUT - LCD display R/W
+const byte LCD_RS_PIN = 8; // OUTPUT - LCD display reset
+const byte LCD_EN_PIN = 9; // OUTPUT - LCD display enable
+
+byte lcd_rows = 2;
+byte lcd_cols = 16;
+bool ledGridEnabled = false;
+byte r;
 
 // functions declaration
 void pinsSetup();
-void lcdprn(char *st, byte line);
-void lcdprn(String st, byte line);
 void millisRoutine(uint32_t ms);
-void _outptest();
+//void _outptest();
 
 // buttons debounce objects
 Bounce nextButton = Bounce(NEXTB_PIN, DEBOUNCE_T);
 Bounce enterButton = Bounce(ENTRB_PIN, DEBOUNCE_T);
 Bounce backButton = Bounce(BACKB_PIN, DEBOUNCE_T);
 
-//LCD display pins setup
-LiquidCrystalFast lcd(LCD_RS_PIN, LCD_EN_PIN, LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
-
 // timers declaration
 TimerTask *millis_tmr, *lamps_tmr, *sols_tmr, *snd_tmr;
-TimerSet tset;
+TimerSet *tset;
 
 void setup() {
 
   // Teensy I/O pins setup
   pinsSetup();
 
-  // Serial COM init
-  Serial.begin(BAUDRATE);
-  delay(1000);
-
   // SPI init
-  Serial.println(F("Starting SPI..."));
   SPI.begin();
-  delay(1000);
 
   // MCP init
-  Serial.println(F("MCP init..."));
   MCP_init(GPIO_SS_PIN);
-  delay(1000);
+  
+  // Serial COM init
+  Serial.begin(BAUDRATE);
+
+  // LCD setup
+  lcd.begin(lcd_cols, lcd_rows);
+  lcd.clear();
+
+  // messages output initialization
+  lcdOutputEnabled = true;
+  serialOutputEnabled = true;
 
   // LED grid init
-  Serial.println(F("Led Grid init..."));
+  outpln(F("Led Grid init..."));
   initLedGrid(LG_SS_PIN);
-  setLGintens(2);
-  delay(1000);
+  setLGintens(6);
+  clearLGgrid();
+  //writeSound(1); // LED init view using SOUND output
 
   // API setup
-  Serial.println(F("API init..."));
+  outpln(F("API init..."));
   initAPI();
-  delay(1000);
+  //writeSound(2);
 
-  Serial.println(F("OUTPUT tests..."));
-  /* while (1) */ _outptest();
-  delay(1000);
+  //return;
+
+  // timers
+  tset = new TimerSet();
+  outpln(F("Timers init..."));
+  //millis_tmr = new TimerTask(millisRoutine, 1);
+  //millis_tmr->tag = (const char *)F("Milliseconds tasks");
+  lamps_tmr = new TimerTask(updateLamps, LMP_TMR_PERIOD, "Lamps");
+  sols_tmr = new TimerTask(checkSolenoids, SOL_TMR_PERIOD, "Solenoids");
+  snd_tmr = new TimerTask(checkSoundCmd, SND_TMR_PERIOD, "Sound");
+  //writeSound(3);
+  //tset->add(millis_tmr);
+  tset->add(lamps_tmr);
+  tset->add(sols_tmr);
+  tset->add(snd_tmr);
+  //writeSound(4);
+  lamps_tmr->enable();
+  sols_tmr->enable();
+  snd_tmr->enable();
 
   // pinball init
-  Serial.println(F("Pinball init..."));
+  outpln(F("Pinball init..."));
+  lcd.setCursor(0, 1);
+  lcd.print(freeMemory());
+  lcd.print(" bytes free");
   initPinball();
-  delay(1000);
+  //writeSound(5);
 
-  // timers setup and function associations
-  Serial.println(F("Timers init..."));
-  millis_tmr = new TimerTask(millisRoutine, 1);
-  lamps_tmr = new TimerTask(updateLamps, LMP_TMR_PERIOD);
-  sols_tmr = new TimerTask(checkSolenoids, SOL_TMR_PERIOD);
-  snd_tmr = new TimerTask(checkSoundCmd, SND_TMR_PERIOD);
-  TimerSet tset;
-  tset.add(millis_tmr);
-  tset.add(lamps_tmr);
-  tset.add(sols_tmr);
-  tset.add(snd_tmr);
+  outpln(F("Go..."));
+  setPinMode(START_MODE);
 
-  // Go!
-  Serial.println(F("Go..."));
-  lcd.clear();
-  lcdprn("Running...", 0);
-  tset.enableAllTimers();
 }
 
 // top-most Teensy loop
 void loop() {
-  uint32_t loopStartT, nextEventT; // [ms]
-  uint32_t cumWorkTime, batchT, t1, t2; // [us]
+  uint32_t t, loopStartT, millisRoutineT; // [ms]
+  uint32_t cumWorkTime, batchPeriod, t1, t2, dt; // [us]
   byte busy_perc; // [%]
+  uint32_t loops;
 
   while(1) {
+    //_outptest();
+    //return;
+
+    loops = 0;
     cumWorkTime = 0;
-    batchT = BATCH_DELAY * 1000;
-    nextEventT = batchT;
+    batchPeriod = BATCH_DELAY * 1000;
     loopStartT = millis();
+    millisRoutineT = 0;
     do { // Batch loop
       t1 = micros();
-      nextEventT = tset.checkTimerTasks();
+
+      t = millis();
+      if (t != millisRoutineT) {
+        millisRoutineT = t;
+        millisRoutine(t);
+      }
+
+      //millisRoutine(0);
+
+      tset->checkTimerTasks();
       t2 = micros();
-      cumWorkTime += (t2 - t1);
-      delay(nextEventT);
+      dt = t2 - t1;
+      //delayMicroseconds(998-dt);
+      cumWorkTime += dt;
+      loops++;
     } while (millis() - loopStartT < BATCH_DELAY);
-    busy_perc = (byte)(((cumWorkTime * 100) / batchT) & 0xff);
+    busy_perc = (byte)(((cumWorkTime * 100) / batchPeriod) & 0xff);
     Serial.print(busy_perc);
-    Serial.println("%");
+    Serial.print("% - ");
+    Serial.print(loops);
+    Serial.println(" loops/sec");
+    if (lcdOutputEnabled) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print(busy_perc);
+      lcd.print("%");
+      lcd.setCursor(0, 1);
+      lcd.print(loops);
+      lcd.print(" loops/sec");
+    }
   };
 }
 
@@ -164,22 +197,26 @@ void pinsSetup() {
   pinMode(D_LD1_PIN, OUTPUT);
   pinMode(D_LD2_PIN, OUTPUT);
   pinMode(D_RES_PIN, OUTPUT);
-
   digitalWrite(GPIO_SS_PIN, HIGH);
   digitalWrite(LG_SS_PIN, HIGH);
   digitalWrite(SD_SS_PIN, HIGH);
-  digitalWrite(D_LD1_PIN, HIGH);
-  digitalWrite(D_LD2_PIN, HIGH);
-  digitalWrite(D_RES_PIN, HIGH);
+  digitalWrite(D_LD1_PIN, LOW);
+  digitalWrite(D_LD2_PIN, LOW);
+  digitalWrite(D_RES_PIN, LOW);
 }
 
 // system routines to call every 1 millisecond
 void millisRoutine(uint32_t ms) {
-  uint16_t dd;
   bool b;
+  byte ret;
+
+  if (ms == 0) ms = millis();
+  if (++r > 7) r = 0;
+  setLedRow(r, lamps[r<<1] | (lamps[(r<<1)+1]<<4));
 
   // SWITCH GRID READING
-  getNextReturns(ms);
+  ret = getNextReturns(ms);
+  if (ledGridEnabled) setLedRow(strobe, ret);
 
   // DISPLAY UPDATE
   pushByteOnDisplayRows();
@@ -193,16 +230,6 @@ void millisRoutine(uint32_t ms) {
   if (b && backButton.fallingEdge()) onPRBButtonPressed(BACK_BUTT);
 }
 
-
-void lcdprn(const char *st, byte line) {
-  lcd.setCursor(0, line);
-  lcd.print(st);
-}
-
-void lcdprn(String st, byte line) {
-  lcd.setCursor(0, line);
-  lcd.print(st);
-}
 
 // (temporary) test routine for Teensy outputs
 void _outptest() {
@@ -227,10 +254,10 @@ void _outptest() {
     delay(100);
   }
   for (i=0; i<32; i++) {
-    setSound(i);
+    writeSound(i);
     delay(100);
   }
-  setSound(0);
+  writeSound(0);
   for (i=0; i<8; i++) {
     setLedRow(i,1<<i);
     delay(100);

@@ -9,11 +9,9 @@
 * lamps, displays, solenoids, sound, switches.
 */
 
-//#include <LiquidCrystal.h>
-#include <LiquidCrystalFast.h>
-#include "mcp_io.h"
+//#include "mcp_io.h"
 #include "display.h"
-//#include "sdio.h"
+#include "timerTask.h"
 
 #define DEF_BLINK_TIME 500
 #define SW_ONOFF_MIN_TIME 50
@@ -22,10 +20,7 @@
 
 #define writeSound(b)  mcpWritePB(3, b)
 #define write4Lamps(a, b)  mcpWrite(1, ( mux16[a]<<4) | ((b) & 0xf) )
-#define writeDisplayData(b)  mcpWritePB(3, b)
-#define writeDisplayLD1(b)  digitalWrite(LD1_PIN, ((b) ? HIGH : LOW)
-#define writeDisplayLD2(b)  digitalWrite(LD2_PIN, ((b) ? HIGH : LOW)
-#define writeDisplayReset(b)  digitalWrite(DRES_PIN, ((b) ? LOW : HIGH)
+#define writeDisplayAndSoundReset(b)  digitalWrite(D_RES_PIN, (b) ? LOW : HIGH)
 #define writeStrobes(b)  mcpWritePA(2, (b & 0xff))
 #define writeSolenoids(a)  mcpWrite(0, a)
 #define RETURNS()  mcpReadPB(2)
@@ -69,7 +64,7 @@ struct Solenoid {
 
 Solenoid solen[32];
 
-byte sound;
+//byte sound;
 uint16_t solenoids;
 byte strobe;
 byte lastSwitchClosed;
@@ -101,8 +96,7 @@ void setSound(byte snd);
 void checkSoundCmd(uint32_t t);
 void setStrobe(byte n);
 bool readMatrixSw(byte col, byte row);
-void clearDispl(byte line);
-void getNextReturns(uint32_t t);
+byte getNextReturns(uint32_t t);
 void checkSolenoids(uint32_t t);
 //void setSolenoidsActiveTime(uint16_t *solTimes);
 bool isSpecialLamp(byte lamp);
@@ -116,15 +110,14 @@ void initAPI() {
   int i;
 
   // machine setup
-  writeSound(0);
-  writeStrobes(0xff);
-  resetLamps();
+  writeSolenoids(0);
+  writeSound(0xff); // reset sound output (active low)
+  writeStrobes(0xff); // reset strobes output (active low)
   resetSolenoids();
+  resetLamps();
   strobe = 0;
-  setStrobe(strobe);
-  for (i=0; i<2; i++) clearDisplayRow(i);
+  //sound = 0;
   initDisplay();
-  for (i=0; displayInitSeq[i] != 0; i++) dPushCmd(3, displayInitSeq[i]);
 }
 
 // note:
@@ -139,7 +132,7 @@ void setSolenoid(byte n, bool active) {
   if (active) solen[n].activationTime = millis();
   if (n >= 1 && n <= 9) {
     if (active) solenoids |= bit(n-1);
-    else solenoids &= 0x1ff - bit(n-1);
+    else solenoids &= ~bit(n-1);
     writeSolenoids(solenoids);
   }
   else if (n >= 16 && n <= 32) setLamp(n & 0xf, active); // lamps 0..15
@@ -169,7 +162,14 @@ void setSolenoidActiveTime(byte n, uint16_t actPeriod) {
 }
 
 void resetSolenoids() {
-  for (byte i=0; i<32; i++) setSolenoid(i, false);
+  for (byte n=1; n<=9; n++) {
+    solen[n].state = false;
+    solen[n].newState = false;
+    solen[n].activePeriod = 0;
+    solen[n].delayedSwitch = false;
+  }
+  solenoids = 0;
+  writeSolenoids(0);
 }
 
 // set a lamp on or off, with status memory
@@ -197,12 +197,11 @@ bool readLamp(byte n) {
   return ((lamps[n/4] & bit(n%4)) != 0);
 }
 
-// switch immediately all lamps off
+// switch all lamps off
 void resetLamps() {
   for (int i=0; i<12; i += 2) {
     lamps[i] = 0;
-    write4Lamps(i, 0);
-    lampsUpdate[i] = false;
+    lampsUpdate[i] = true;
   }
 }
 
@@ -236,7 +235,7 @@ void setSound(byte snd) {
 
   if (sndBufLen >= SNDBUFF_LEN) return; // return on full buffer
   i = (sndBufIdx + sndBufLen) % SNDBUFF_LEN; // cursor
-  sndCmdBuf[i] = snd & 0x1f;
+  sndCmdBuf[i] = snd;
   sndBufLen++;
 }
 
@@ -262,7 +261,7 @@ void checkSoundCmd(uint32_t t) {
 // set one of eight strobes bit to 0 (active low)
 // n = 0..7
 void setStrobe(byte n) {
-  writeStrobes( ~(((byte)1) << (n & 0b111)) );
+  writeStrobes( ~(((byte)1) << (n & 0b00000111)) );
 }
 
 bool readMatrixSw(byte col, byte row) {
@@ -277,15 +276,14 @@ bool readMatrixSw(byte col, byte row) {
 
 // 1. reads returns on current strobe line
 // 2. call special subroutine on any open/closed-switch event (with debounce effect)
-// 3. updates returns LED grid
-// 4. increments strobe line for next read
-void getNextReturns(uint32_t t) {
+// 3. increments strobe line for next read
+byte getNextReturns(uint32_t t) {
   byte i, ret, diff, b, ss, sw;
   byte stbx8;
 
   ret = RETURNS();
   diff = ret ^ returns_latch[strobe]; // return byte changed bits
-  if (diff) { // some change occurred
+  if (diff) { // changes detection
     stbx8 = strobe << 3;
     for (i=0; i<8; i++) { // for every bit...
       b = 1<<i; // bit balue
@@ -307,12 +305,16 @@ void getNextReturns(uint32_t t) {
         }
       }
     }
-    setLedRow(strobe, ret);
+    //if (ledGridEnabled) setLedRow(strobe, ret);
   }
   if (++strobe > 7) strobe = 0;
   setStrobe(strobe);
+  return ret;
 }
 
+// checks whether:
+// - delay activation time elapsed (when delayedSwitch = true)
+// - maximum active time elapsed for safe switch-off
 void checkSolenoids(uint32_t t) {
   uint16_t maxTime;
   Solenoid sol;
