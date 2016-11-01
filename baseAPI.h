@@ -12,6 +12,10 @@
 //#include "mcp_io.h"
 #include "display.h"
 #include "timerTask.h"
+#include "ledGrid.h"
+
+#define OFF false
+#define ON true
 
 #define DEF_BLINK_TIME 500
 #define SW_ONOFF_MIN_TIME 50
@@ -25,7 +29,7 @@
 #define writeSolenoids(a)  mcpWrite(0, a)
 #define RETURNS()  mcpReadPB(2)
 #define SLAM_SW()  (digitalRead(SLAM_PIN) == HIGH)
-#define getSwitch(n) ( ( returns_latch[(n)>>3] & (1<<((n)&7)) ) > 0 ? 1 : 0 )
+#define getSwitch(n) ( ( returns_latch[(n)%8] & bitv[(n)&7)] ) > 0 ? 1 : 0 )
 
 //PROGMEM const char *inpName[] = { "RETURNS" , "SLAM SWITCH" };
 //PROGMEM const char *outpName[] = { "STROBES", "SOLENOIDS", "SOUND", "LAMPS", "DISPLAY" };
@@ -41,6 +45,8 @@ PROGMEM const uint16_t mux16[16] = // 16 bit mux outputs
   { 0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080,
     0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000 };
 
+PROGMEM const byte bitv[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+
 enum inputType { RETURNS, SLAM_SW };
 enum outputType { STROBES, SOLENOIDS, SOUND, LAMPS, DISPL };
 
@@ -54,15 +60,16 @@ extern const uint16_t solMaxOnTime[];
 
 // single solenoid state
 struct Solenoid {
-  bool state = false;
+  bool active = false;
   bool newState = false;
   bool delayedSwitch = false;
-  uint32_t activationTime; // time when solenoid has activated
+  uint32_t setTime; // time when solenoid has activated
   uint16_t activePeriod = 0; // ms
   uint16_t switchDelay = 0; // ms
 };
 
-Solenoid solen[32];
+Solenoid solen[33]; // solen[0] not used
+//Solenoid solen[10]; // solen[0] not used
 
 //byte sound;
 uint16_t solenoids;
@@ -83,9 +90,9 @@ bool sndCmdOut = false;
 //extern const uint16_t solMaxOnTime[];
 
 void initAPI();
-void setSolenoid(byte n, bool state);
-void setSolenoid(byte n, bool state, uint16_t actPeriod);
-void setSolenoidDelayed(byte n, bool state, uint16_t swDelay);
+void setSolenoid(byte n, bool active);
+void setSolenoid(byte n, bool active, uint16_t actPeriod);
+void setSolenoidDelayed(byte n, bool active, uint16_t swDelay);
 void resetSolenoids();
 void setLamp(byte n, bool state);
 void set4Lamps(byte set, byte states);
@@ -125,35 +132,57 @@ void initAPI() {
 // n = [10..15] no effect
 // n = [16..32] "lamp" solenoid 0..15
 void setSolenoid(byte n, bool active) {
+  Solenoid *sol;
+
   if (n < 1 || n > 32) return;
-  if (n > 9 && n < 16) return;
-  solen[n].state = active;
-  solen[n].newState = active;
-  if (active) solen[n].activationTime = millis();
+  //if (n > 9 && n < 16) return;
+  sol = &(solen[n]);
+  sol->active = active;
+  sol->newState = active;
+  sol->setTime = millis();
   if (n >= 1 && n <= 9) {
     if (active) solenoids |= bit(n-1);
     else solenoids &= ~bit(n-1);
     writeSolenoids(solenoids);
   }
   else if (n >= 16 && n <= 32) setLamp(n & 0xf, active); // lamps 0..15
-  solen[n].activePeriod = 0;
-  solen[n].delayedSwitch = false;
+  sol->activePeriod = 0;
+  sole->delayedSwitch = false;
 }
 
-void setSolenoid(byte n, bool state, uint16_t actPeriod) {
-  setSolenoid(n, state);
+/*
+void setSolenoid(byte n, bool active) {
+  Solenoid *sol;
+
+  if (n < 1 || n > 9) return;
+  sol = &(solen[n]);
+  sol->active = active;
+  sol->newState = active;
+  sol->setTime = millis();
+  if (active) solenoids |= bit(n-1);
+  else solenoids &= ~bit(n-1);
+  writeSolenoids(solenoids);
+  sol->activePeriod = 0;
+  sol->delayedSwitch = false;
+}
+*/
+
+void setSolenoid(byte n, bool active, uint16_t actPeriod) {
+  setSolenoid(n, active);
   solen[n].activePeriod = actPeriod;
 }
 
-void setSolenoidDelayed(byte n, bool state, uint16_t swDelay) {
+void setSolenoidDelayed(byte n, bool active, uint16_t swDelay) {
+  Solenoid *sol = &(solen[n]);
+
   if (swDelay == 0) {
-    setSolenoid(n, state);
+    setSolenoid(n, active);
     return;
   }
-  solen[n].delayedSwitch = true;
-  solen[n].newState = state;
-  solen[n].switchDelay = swDelay;
-  solen[n].activationTime = millis();
+  sol->newState = active;
+  sol->delayedSwitch = true;
+  sol->setTime = millis();
+  sol->switchDelay = swDelay;
 }
 
 void setSolenoidActiveTime(byte n, uint16_t actPeriod) {
@@ -162,11 +191,13 @@ void setSolenoidActiveTime(byte n, uint16_t actPeriod) {
 }
 
 void resetSolenoids() {
+  Solenoid *sol;
   for (byte n=1; n<=9; n++) {
-    solen[n].state = false;
-    solen[n].newState = false;
-    solen[n].activePeriod = 0;
-    solen[n].delayedSwitch = false;
+    sol = &(solen[n]);
+    sol->active = false;
+    sol->newState = false;
+    sol->activePeriod = 0;
+    sol->delayedSwitch = false;
   }
   solenoids = 0;
   writeSolenoids(0);
@@ -251,17 +282,18 @@ void checkSoundCmd(uint32_t t) {
   if (++sndBufIdx >= SNDBUFF_LEN) sndBufIdx = 0;
   sndBufLen--;
   sndCmdOut = true;
-  writeSound(~snd);
   // sound16 light #4 update
   if (snd & 0x10) lamps[0] |= 0x10;
   else lamps[0] &= 0xef;
   write4Lamps(1, (lamps[0] & 0xf0) >> 4); // immediate light #4 update
+  writeSound(~snd);
 }
 
 // set one of eight strobes bit to 0 (active low)
 // n = 0..7
 void setStrobe(byte n) {
-  writeStrobes( ~(((byte)1) << (n & 0b00000111)) );
+  //writeStrobes( ~(((byte)1) << (n & 0b00000111)) );
+  writeStrobes( ~bitv[n & 7] );
 }
 
 bool readMatrixSw(byte col, byte row) {
@@ -319,20 +351,39 @@ void checkSolenoids(uint32_t t) {
   uint16_t maxTime;
   Solenoid sol;
 
-  for (byte i=1; i<32; i++) {
+  /*
+  for (byte i=1; i<=32; i++) {
     if (i >= 10 && i < 16) continue;
     sol = solen[i];
     if (sol.delayedSwitch) { // delayed switch
-      if (t - sol.activationTime >= sol.switchDelay) // delay elapsed
+      if (t - sol.setTime >= sol.switchDelay) // delay elapsed
         setSolenoid(i, sol.newState);
     }
-    if (sol.state) { // solenoid activated ?
+    if (sol.active) { // solenoid activated ?
       maxTime = 0;
       if (solMaxOnTime[i] > 0) maxTime = solMaxOnTime[i];
       if (sol.activePeriod > 0 && sol.activePeriod < maxTime) maxTime = sol.activePeriod;
       if (maxTime > 0) { // limited active-period ?
-        if (t - sol.activationTime > maxTime) setSolenoid(i, false);
+        if (t - sol.setTime > maxTime) setSolenoid(i, false);
       }
+    }
+  }
+  */
+  for (byte i=1; i<=32; i++) {
+    if (i >= 10 && i < 16) continue;
+    sol = solen[i];
+    if (sol.active) { // solenoid activated ?
+      maxTime = solMaxOnTime[i];
+      if (sol.activePeriod > 0 && sol.activePeriod < maxTime) maxTime = sol.activePeriod;
+      if (maxTime > 0) { // limited active-period ?
+        if (t - sol.setTime > maxTime) {
+          setSolenoid(i, false);
+          continue;
+        }
+      }
+    }
+    if (sol.delayedSwitch) { // delayed switch
+      if (t - sol.setTime >= sol.switchDelay) setSolenoid(i, sol.newState);
     }
   }
 }
@@ -347,7 +398,7 @@ void checkSolenoids(uint32_t t) {
     if (solen[i].active) { // solenoid activated?
       stdTime = solen[i].activePeriod;
       maxTime = solMaxOnTime[i];
-      dt = t - solen[i].activationTime;
+      dt = t - solen[i].setTime;
       if ( (maxTime > 0 && dt > maxTime) || (stdTime > 0 && dt > stdTime) )
           setSolenoid(i, false);
     }

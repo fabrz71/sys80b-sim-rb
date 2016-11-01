@@ -10,7 +10,6 @@
 */
 
 #include "baseAPI.h"
-#include "ledGrid.h"
 #include "flashData.h"
 #include "displFX.h"
 #include "LightSet.h"
@@ -36,6 +35,9 @@
 #define setTrelay(s) setLamp(1,s)
 #define setArelay(s) setLamp(14,s)
 
+// base functions
+#define BALL_IN_OUTHOLE() getSwitch(66)
+
 // standard "lamp" solenoids (controlled as lamps)
 const int RELAY_Q_SOL = 16;
 const int RELAY_T_SOL = 17;
@@ -44,6 +46,11 @@ const int SND16_SOL = 20;
 
 enum pinball_mode { START_MODE, ATTRACT_MODE, GAME_MODE, TEST_MODE, BOOKKEEP_MODE };
 enum coinChutes { LEFT_CHUTE, CENTER_CHUTE, RIGHT_CHUTE };
+
+// GAME_INIT - new game initialization and remainig ball expulsion
+// GAME_NEWBALL - new ball out
+// ...
+enum gameModeSteps { GAME_INIT, GAME_NEWBALL };
 
 // players score position on display
 PROGMEM const byte dPlayerRow[] = { 0, 0, 1, 1 };
@@ -113,6 +120,7 @@ bool releaseBall();
 void setDelayedCall(func_t sub, uint32_t dlay);
 void setPeriodicCall(func_t sub, uint32_t period);
 void startGame(uint32_t t);
+void switchModeStep(byte stp);
 
 extern void onEvent(byte sw);
 extern String getGameName();
@@ -132,8 +140,8 @@ void initPinball_generic() {
   setActiveLightStage(lightStage);
   lightStageEnabled = true;
   initDisplayFx();
-  Serial.print("Power on counter: ");
-  Serial.println(incrementPowerOnCounterStat());
+  outp_clr("Power on counter: ");
+  outpln(incrementPowerOnCounterStat());
   //loadStats();
   loadCoinsPerCredits();
   loadAwardScoreLevels();
@@ -158,8 +166,8 @@ void initGame_generic() {
 void setPinMode(byte mode) {
   String s;
 
-  Serial.print(F("Switching to mode "));
-  Serial.println(mode);
+  outp_clr(F("Switching mode:"));
+  outpln(mode);
   pinballMode = mode;
   modeStep = 0;
   switch (pinballMode) {
@@ -365,7 +373,7 @@ bool releaseBall() {
   bool ballReady;
 
   ballReady = (getSwitch(36) > 0);
-  if (ballReady) setSolenoid(BRELEASE_SOL, true, 500); // ball release
+  if (ballReady) setSolenoid(BRELEASE_SOL, true, 250); // ball release
   return ballReady;
 }
 
@@ -396,6 +404,10 @@ void setPeriodicCall(func_t sub, uint32_t period) {
 
 void startGame(uint32_t t) {
   //Serial.println("startGame()");
-  setPinMode(ATTRACT_MODE);
+  setPinMode(GAME_MODE);
 }
 
+void switchModeStep(byte stp) {
+  modeSTep = stp;
+  // ... msg output
+}

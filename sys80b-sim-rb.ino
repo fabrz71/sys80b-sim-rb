@@ -50,8 +50,6 @@ const byte LCD_EN_PIN = 9; // OUTPUT - LCD display enable
 
 byte lcd_rows = 2;
 byte lcd_cols = 16;
-bool ledGridEnabled = false;
-byte r;
 
 // functions declaration
 void pinsSetup();
@@ -77,7 +75,7 @@ void setup() {
 
   // MCP init
   MCP_init(GPIO_SS_PIN);
-  
+
   // Serial COM init
   Serial.begin(BAUDRATE);
 
@@ -90,14 +88,15 @@ void setup() {
   serialOutputEnabled = true;
 
   // LED grid init
-  outpln(F("Led Grid init..."));
+  outpln_clr(F("Led Grid init..."));
+  ledGridEnabled = true;
+  ledGridMode = LG_LIGHTS;
   initLedGrid(LG_SS_PIN);
-  setLGintens(6);
-  clearLGgrid();
+  setLGintens(3);
   //writeSound(1); // LED init view using SOUND output
 
   // API setup
-  outpln(F("API init..."));
+  outpln_clr(F("API init..."));
   initAPI();
   //writeSound(2);
 
@@ -122,7 +121,7 @@ void setup() {
   snd_tmr->enable();
 
   // pinball init
-  outpln(F("Pinball init..."));
+  outpln_clr(F("Pinball init..."));
   lcd.setCursor(0, 1);
   lcd.print(freeMemory());
   lcd.print(" bytes free");
@@ -169,6 +168,7 @@ void loop() {
       loops++;
     } while (millis() - loopStartT < BATCH_DELAY);
     busy_perc = (byte)(((cumWorkTime * 100) / batchPeriod) & 0xff);
+    /*
     Serial.print(busy_perc);
     Serial.print("% - ");
     Serial.print(loops);
@@ -182,6 +182,11 @@ void loop() {
       lcd.print(loops);
       lcd.print(" loops/sec");
     }
+    */
+    outp_clr(busy_perc);
+    outp("% - ");
+    outp(loops);
+    outpln(" loops/s");
   };
 }
 
@@ -211,12 +216,16 @@ void millisRoutine(uint32_t ms) {
   byte ret;
 
   if (ms == 0) ms = millis();
-  if (++r > 7) r = 0;
-  setLedRow(r, lamps[r<<1] | (lamps[(r<<1)+1]<<4));
 
   // SWITCH GRID READING
   ret = getNextReturns(ms);
-  if (ledGridEnabled) setLedRow(strobe, ret);
+
+  // LED grid update
+  if (ledGridMode == LG_SWITCHES) setLedRowReverse(strobe, ret);
+  else if (ledGridMode == LG_LIGHTS) {
+    byte i = (strobe & 7)<<1;
+    setLedRowReverse(strobe, lamps[i] | (lamps[i+1] << 4));
+  }
 
   // DISPLAY UPDATE
   pushByteOnDisplayRows();
@@ -230,7 +239,7 @@ void millisRoutine(uint32_t ms) {
   if (b && backButton.fallingEdge()) onPRBButtonPressed(BACK_BUTT);
 }
 
-
+/*
 // (temporary) test routine for Teensy outputs
 void _outptest() {
   int i;
@@ -268,3 +277,4 @@ void _outptest() {
   }
   clearLGgrid();
 }
+*/
