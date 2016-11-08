@@ -47,7 +47,7 @@ enum lg_mode_enum { LG_SWITCHES, LG_LIGHTS };
 
 int lg_cs_pin; // SPI CS signal
 bool ledGridEnabled = false;
-byte ledGridMode = false;
+//byte ledGridMode = false;
 
 void initLedGrid(int cspin);
 void _writeCmd(byte adr, byte data);
@@ -61,7 +61,7 @@ void initLedGrid(int cspin) {
   _writeCmd(CMD_DIGITS, 7); // 8 rows ("digits")
   shutDownMode(false); // Shutdown mode off
   clearLGgrid();
-  if (ledGridEnabled) for (byte i=0; i <8; i++) setLedRow(i, 1<<i); // test "slash"
+  for (byte i=0; i <8; i++) setLedRow(i, 1<<i); // test "slash"
 }
 
 void _writeCmd(byte adr, byte data) {
