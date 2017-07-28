@@ -37,6 +37,7 @@
 
 // base functions
 #define BALL_IN_OUTHOLE() getSwitch(66)
+#define tilt() switchModeStep(GAME_TILT);
 
 // standard "lamp" solenoids (controlled as lamps)
 const int RELAY_Q_SOL = 16;
@@ -49,26 +50,28 @@ enum coinChutes { LEFT_CHUTE, CENTER_CHUTE, RIGHT_CHUTE };
 
 // GAME_INIT - new game initialization and remainig ball expulsion
 // GAME_NEWBALL - new ball out
-// ...
-enum gameModeSteps { GAME_INIT, GAME_NEWBALL };
+// ... (more to come)
+enum gameModeSteps { GAME_INIT, GAME_NEWBALL, GAME_TILT, GAME_END };
 
 // players score position on display
 PROGMEM const byte dPlayerRow[] = { 0, 0, 1, 1 };
 PROGMEM const byte dPlayerCol[] = { 0, 12, 0, 12 };
 const char *zeroStr = "0000000";
 
+// top score entry
 struct topPlay {
   uint32_t score;
   byte initials[3];
 };
 topPlay topScore[TOP_SCORES];
 
-struct Player{
-  uint32_t score;
-  uint32_t bonus;
+// player game status
+struct Player {
+  uint32_t score; // total play score
+  uint32_t bonus; // ball bonus score
   byte ballOnPlay;
   byte totalGameBalls; // balls of player game
-  byte ballsInHole;
+  //byte ballsInHole;
   byte awardLevelReached;
   bool topScorer;
   bool gameOver;
@@ -76,20 +79,21 @@ struct Player{
 Player player[MAX_PLAYERS];
 
 byte credits;
-byte ch_coins[3];
-byte ch_credits[3];
-byte coins[3];
-byte pinballMode;
+byte ch_coins[3]; // coins for credits (left, center, right) (settings)
+byte ch_credits[3]; // credits by coins (left, center, right) (settings)
+byte coins[3]; // chute coins inserted (left, center, right)
+byte pinballMode; // see enum pinball_mode
 byte defaultBallsPerPlay;
-byte modeStep;
+byte modeStep; // see enum gameModeSteps
 byte playerOn; // 0..3
-byte players; // 1..4
-bool allBallsInHole;
+bool gameOver; // no players on game
+//byte players; // 1..4
+//bool allBallsInHole;
 byte ballsOnField;
-uint32_t awardLevelScore[3];
+uint32_t awardLevelScore[3]; // next award score
 byte lastSw;
 uint16_t switches;
-bool tiltEnabled;
+//bool tiltEnabled;
 Light light[LAMPS_COUNT];
 LightStage *lightStage;
 bool lightStageEnabled;
@@ -113,14 +117,13 @@ void incrementPlayers();
 void incrementBalls();
 void addScore(uint32_t sc);
 void addBonus(uint32_t sc);
-bool switchToNextPlayer();
-void tilt();
-void resetTilt();
+void setPlayerOn(byte newPlayer);
 bool releaseBall();
 void setDelayedCall(func_t sub, uint32_t dlay);
 void setPeriodicCall(func_t sub, uint32_t period);
 void startGame(uint32_t t);
 void switchModeStep(byte stp);
+byte getNextPlayerOn();
 
 extern void onEvent(byte sw);
 extern String getGameName();
@@ -129,69 +132,109 @@ extern void startAttractMode();
 //extern void startBookkeepingMode();
 //extern void startTestMode();
 
+// pinball generic initialization procedures
 void initPinball_generic() {
   byte i;
 
+  // resets sound and display
   writeDisplayAndSoundReset(true);
+
+  // setting up general purpose timer
   gpTimer = new TimerTask(NULL, 1000, "GPtmr");
   gpTimer->disable();
   tset->add(gpTimer);
+
+  // setting up standard light stage
   lightStage = new LightStage(light, LAMPS_COUNT);
   setActiveLightStage(lightStage);
   lightStageEnabled = true;
   initDisplayFx();
+
+  // power-on stats update
   outp_clr("Power on counter: ");
   outpln(incrementPowerOnCounterStat());
+
+  // loads settings and NV values
   //loadStats();
   loadCoinsPerCredits();
   loadAwardScoreLevels();
   loadHighScores();
+  defaultBallsPerPlay = (getSettingSwitch(25) == 1) ? 3 : 5;
+
+  // variables init
   credits = 0;
   players = 0;
-  defaultBallsPerPlay = (getSettingSwitch(25) == 1) ? 3 : 5;
+  gameOver = true;
   for (i=0; i<3; i++) coins[i] = 0; // coins reset
   for (i=0; i<MAX_PLAYERS; i++) player[i].score = 0; // scores reset
+
+  // re-enables display and sounds
   writeDisplayAndSoundReset(false);
-  setSolenoid(RELAY_Q_SOL, true); // game over
-  //setPinMode(START_MODE);
+  clearDispl();
+  //setSound(SILENT_SND); // TODO
+  //setSolenoid(RELAY_Q_SOL, true); // game over
+  setPinMode(START_MODE);
 }
 
 void initGame_generic() {
-  playerOn = 0; // 1st player
-  player[playerOn].ballOnPlay = 1;
   setSolenoid(RELAY_T_SOL, false); // NO tilt
   setSolenoid(RELAY_Q_SOL, false); // NO game over
+  setPlayerOn(0); // 1st player
+  player[playerOn].ballOnPlay = 1;
 }
 
 void setPinMode(byte mode) {
   String s;
 
-  outp_clr(F("Switching mode:"));
+  outp_clr(F("Switching mode: "));
   outpln(mode);
   pinballMode = mode;
   modeStep = 0;
   switch (pinballMode) {
     case START_MODE:
+      setSolenoid(RELAY_Q_SOL, true); // game over
       setDisplayText(0, (const char *) F("SYS80/B PRB V1.0 BY"));
       setDisplayText(1, (const char *) F(" FABVOLPI@GMAIL.COM"));
-      setDelayedCall(startGame, 500); // switches to another state
+      //setDelayedCall(startGame, 500); // switches to another state
       tset->print();
       break;
     case ATTRACT_MODE:
       clearDispl();
       startAttractMode();
-      // ...
+      // TODO...
       break;
     case GAME_MODE:
       initGame_generic();
-      // ...
+      // TODO...
       break;
     case TEST_MODE:
       initMenu();
-      // ...
+      // TODO...
       break;
     case BOOKKEEP_MODE:
-      // ...
+      // TODO...
+      break;
+  }
+}
+
+void switchModeStep(byte stp) {
+  modeSTep = stp;
+  // ... msg output
+  switch(modeStep) {
+    case GAME_INIT:
+      // TODO...
+      break;
+    case GAME_NEWBALL:
+      // TODO...
+      break;
+    case GAME_TILT:
+      setTrelay(true);
+      lightStage.switchOffAllLights();
+      // TODO...
+      break;
+    case GAME_END:
+      gameOver = true;
+      // TODO...
       break;
   }
 }
@@ -335,38 +378,16 @@ void addBonus(uint32_t sc) {
   player[playerOn].bonus += sc;
 }
 
-bool switchToNextPlayer() {
-  byte prevPlayer;
-  bool res;
-
-  prevPlayer = playerOn;
-  if (++playerOn >= MAX_PLAYERS) playerOn = 0;
-  while (player[playerOn].gameOver) {
-    if (++playerOn >= MAX_PLAYERS) playerOn = 0;
-    if (playerOn == prevPlayer) break;
-  }
-  res = !player[playerOn].gameOver; // another player available ?
-  if (res) {
+// sets new player on game, updating display
+void setPlayerOn(byte newPlayer) {
+  playerOn = newPlayer;
+  if (playerOn < 4) {
     int r, c;
     r = dPlayerRow[playerOn];
     c = dPlayerCol[playerOn];
-    startDisplayBlink(playerOn/2, r);
     setDisplayBlinkInterval(r, c, c+7);
+    startDisplayBlink(r, 250, 2000);
   }
-  //if (!res) setPinMode(ATTRACT_MODE);
-  return res;
-}
-
-void tilt() {
-  tiltEnabled = true;
-  setTrelay(true);
-  // ...
-}
-
-void resetTilt() {
-  tiltEnabled = false;
-  setTrelay(false);
-  // ...
 }
 
 bool releaseBall() {
@@ -383,6 +404,7 @@ void updateLamps(uint32_t ms) {
   renderLamps();
 }
 
+// defines the function sub to call after a defined time delay
 void setDelayedCall(func_t sub, uint32_t dlay) {
   gpTimer->disable();
   Serial.print("Setting timer ");
@@ -395,6 +417,7 @@ void setDelayedCall(func_t sub, uint32_t dlay) {
   Serial.println();
 }
 
+// defines the function sub to call periodically with specified period
 void setPeriodicCall(func_t sub, uint32_t period) {
   gpTimer->disable();
   gpTimer->set(period, true);
@@ -407,7 +430,15 @@ void startGame(uint32_t t) {
   setPinMode(GAME_MODE);
 }
 
-void switchModeStep(byte stp) {
-  modeSTep = stp;
-  // ... msg output
+// gives the next player on play (0..MAX_PLAYERS-1)
+// returns MAX_PLAYERS when all players are over
+byte getNextPlayerOn() {
+  byte p = playerOn++;
+
+  if (p > MAX_PLAYERS) p = 0;
+  while (p <= MAX_PLAYERS) {
+    if (!p.gameOver) break;
+    p++;
+  }
+  return p;
 }

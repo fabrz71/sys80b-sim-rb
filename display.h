@@ -11,7 +11,6 @@
 #include "mcp_io.h"
 
 #define CMD_BUF_LEN 20
-#define DISPLAY_COLS 20
 
 // control data bytes --- da spostare!
 #define CD_BYTE01      0x01
@@ -33,6 +32,8 @@
 #define writeDisplayData(b)  mcpWritePB(3, b)
 #define writeDisplayLD1(b)  digitalWrite(D_LD1_PIN, ((b) ? HIGH : LOW)
 #define writeDisplayLD2(b)  digitalWrite(D_LD2_PIN, ((b) ? HIGH : LOW)
+
+const byte DISPLAY_COLS = 20;
 
 const byte displayInitSequence[] = { // display init sequence (after reset)
   CD_DIGIT_CNT, 20,
@@ -248,11 +249,11 @@ void pushByteOnDisplayRows() {
   delayMicroseconds(10);
   digitalWrite(D_LD1_PIN, LOW);
   digitalWrite(D_LD2_PIN, LOW);
-  
+
   if ((dd & 0x0300) == 0x0300) return; // CMD for both lines has already been sent
   delayMicroseconds(100);
 
-  // SECOND DISPLAY  
+  // SECOND DISPLAY
   dd = getNextDisplayData(); // row 1
   writeDisplayData((byte)(dd & 0xff));
   digitalWrite(D_LD2_PIN, HIGH);

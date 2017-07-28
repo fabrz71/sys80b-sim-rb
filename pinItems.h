@@ -100,6 +100,9 @@ PROGMEM const String solInfo[] = {
 const uint16_t solMaxOnTime[] =
   { 500, 500, 0, 0, 500, 500, 0, 500, 500 };
 
+// solenoid grouping by fuse number
+const byte solFuse[] = { 11, 12, 0, 0, 11, 12, 0, 4, 11 };
+
 // convenience solenoids constants
 enum solenoid_ID {
   HOLE_SOL=1, LSHOOTER_SOL, LTOPDOME_SOL, RTOPDOME_SOL,
@@ -107,36 +110,36 @@ enum solenoid_ID {
 // RAMP_SOL=28, BGATE_SOL, AUGER_SOL };
 
 // sound effects *TODO*
-enum sound_ID { SND_ALLRIGHT=1, 
-                SND2, 
-                SND3, 
-                SND4, 
-                SND5, 
-                SND6, 
+enum sound_ID { SND_ALLRIGHT=1,
+                SND2,
+                SND3,
+                SND4,
+                SND5,
+                SND6,
                 SND_FADING, // fades sound/music volume to 0
                 SND_MAXVOL, // turns volume to max level
                 SND_LOWERVOL, // turns volume to a lower level
-                SND10, 
+                SND10,
                 SND_MUSIC_SPECIAL, // special music (continuos)
-                SND12, 
+                SND12,
                 SND_MUSIC_FINAL,
-                SND14, 
+                SND14,
                 SND_MUSIC, // standard music (continuos)
                 SND16,
-                SND17, 
-                SND18, 
-                SND_COIN, 
+                SND17,
+                SND18,
+                SND_COIN,
                 SND_MUSIC2, // (continuos)
                 SND_MUSIC3, // (continuos)
-                SND22, 
-                SND23, 
+                SND22,
+                SND23,
                 SND24,
-                SND25, 
-                SND26, 
+                SND25,
+                SND26,
                 SND_SIREN_FAST, // fast siren
                 SND_SIREN_SLOW, // slow siren (continuos)
-                SND29, 
-                SND30, 
+                SND29,
+                SND30,
                 SND_SILENCED };
 
 // void string for unused switches in switch matrix
@@ -219,4 +222,3 @@ const byte swRelLamp[] = {
    0, 32, 36, 44,  6,  0,  0,  0, // 6x
    0, 33, 37, 45,  7,  0, 15,  0, // 7x
 };
-

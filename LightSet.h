@@ -18,7 +18,6 @@ class LightSet {
   public:
     const char *nameStr;
     byte *lightNum; // array
-    static Light _tmpLight; // temporary buffer
 
     LightSet(const char *setName, const byte *lightNumber, byte arrayLength);
     LightSet(const char *setName, const byte *lightNumber);
@@ -40,8 +39,10 @@ class LightSet {
     void rotateLeft();
     inline byte length() { return _length; }
     void prLights();
+
   private:
     byte _length;
+    static Light _tmpLight; // temporary buffer
 };
 
 Light LightSet::_tmpLight; // class' static variable init

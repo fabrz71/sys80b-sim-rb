@@ -63,13 +63,15 @@ struct Solenoid {
   bool active = false;
   bool newState = false;
   bool delayedSwitch = false;
+  //bool fuseCheckReq = false;
+  //byte fuseNum;
   uint32_t setTime; // time when solenoid has activated
   uint16_t activePeriod = 0; // ms
   uint16_t switchDelay = 0; // ms
 };
 
-Solenoid solen[33]; // solen[0] not used
-//Solenoid solen[10]; // solen[0] not used
+Solenoid solen[10]; // (1..9) - 0 not used
+Solenoid lampSolen[16]; // special 'lamps'
 
 //byte sound;
 uint16_t solenoids;
@@ -127,51 +129,49 @@ void initAPI() {
   initDisplay();
 }
 
+// sets a solenoid state, updating internal variables
 // note:
 // n = [1..9] standard solenoid
 // n = [10..15] no effect
-// n = [16..32] "lamp" solenoid 0..15
+// n = [16..31] "lamp" solenoid 0..15
 void setSolenoid(byte n, bool active) {
   Solenoid *sol;
+  bool specialSol;
 
   if (n < 1 || n > 32) return;
-  //if (n > 9 && n < 16) return;
-  sol = &(solen[n]);
+  if (n > 9 && n < 16) return;
+  if (n <= 9) {
+    specialSol = false;
+    sol = &(solen[n]);
+  }
+  else {
+    specialSol = true;
+    sol = &(lampSolen[n-16]);
+  }
   sol->active = active;
   sol->newState = active;
   sol->setTime = millis();
-  if (n >= 1 && n <= 9) {
+  if (!specialSol) {
+    if (n >= 16 && n < 32) setLamp(n & 0xf, active); // lamps 0..15
+  }
+  else {
     if (active) solenoids |= bit(n-1);
     else solenoids &= ~bit(n-1);
     writeSolenoids(solenoids);
   }
-  else if (n >= 16 && n <= 32) setLamp(n & 0xf, active); // lamps 0..15
-  sol->activePeriod = 0;
-  sole->delayedSwitch = false;
-}
-
-/*
-void setSolenoid(byte n, bool active) {
-  Solenoid *sol;
-
-  if (n < 1 || n > 9) return;
-  sol = &(solen[n]);
-  sol->active = active;
-  sol->newState = active;
-  sol->setTime = millis();
-  if (active) solenoids |= bit(n-1);
-  else solenoids &= ~bit(n-1);
-  writeSolenoids(solenoids);
   sol->activePeriod = 0;
   sol->delayedSwitch = false;
 }
-*/
 
+// sets a solenoid state, defining active period.
+// actPeriod updates solenoid attribute also when active = false
 void setSolenoid(byte n, bool active, uint16_t actPeriod) {
   setSolenoid(n, active);
   solen[n].activePeriod = actPeriod;
 }
 
+// sets a solenoid state, defining switch delay:
+// solenoid state will switch after the specified delay.
 void setSolenoidDelayed(byte n, bool active, uint16_t swDelay) {
   Solenoid *sol = &(solen[n]);
 
@@ -185,11 +185,12 @@ void setSolenoidDelayed(byte n, bool active, uint16_t swDelay) {
   sol->switchDelay = swDelay;
 }
 
-void setSolenoidActiveTime(byte n, uint16_t actPeriod) {
-  if (n < 1 || n > 32) return;
-  solen[n].activePeriod = actPeriod;
-}
+//void setSolenoidActiveTime(byte n, uint16_t actPeriod) {
+//  if (n < 1 || n > 32) return;
+//  solen[n].activePeriod = actPeriod;
+//}
 
+// resets only normal solenoids (1..9)
 void resetSolenoids() {
   Solenoid *sol;
   for (byte n=1; n<=9; n++) {

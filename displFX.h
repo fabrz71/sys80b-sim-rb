@@ -20,8 +20,8 @@
 enum dispEffect { // single line text display effects:
   DISPL_NO_EFF, // efffects disabled
   DISPL_SHOW_EFF,  // for overwidth msg only, bounces msg from left to right and back
-  DISPL_LSCRL_EFF, // left scroll
-  DISPL_RSCRL_EFF, // right scroll
+  DISPL_LSCRL_EFF, // left scroll text insertion
+  DISPL_RSCRL_EFF, // right scroll text insertion
 };
 
 struct DisplayLine {
@@ -40,8 +40,10 @@ struct DisplayLine {
     TimerTask *blink_timer;
 };
 
-DisplayLine dLine[2];
+DisplayLine dLine[2]; // display lines
+
 extern TimerSet *tset;
+extern DISPLAY_COLS; // display.h
 
 void initDisplayFx();
 void setDisplayText(byte line, const char *text);
@@ -74,6 +76,7 @@ void initDisplayFx() {
   for (byte i=0; i<=1; i++) {
     tset->add(dLine[i].fx_timer);
     tset->add(dLine[i].blink_timer);
+    resetDisplayBlinkInterval(i);
   }
 }
 
@@ -214,6 +217,15 @@ void stopDisplayBlink(byte line) {
 void setDisplayBlink(byte line, bool enabled) {
   if (enabled) startDisplayBlink(line);
   else stopDisplayBlink(line);
+}
+
+void setDisplayBlinkInterval(byte line, byte firstCh, byte lastCh) {
+  dLine[line&1].blinkStartCol = firstCh;
+  dLine[line&1].blinkEndCol = lastCh;
+}
+
+void resetDisplayBlinkInterval(byte line) {
+  setDisplayBlinkInterval(line, 0, DISPLAY_COLS-1);
 }
 
 void setDisplayBlinkPeriod(byte line, uint16_t bPeriod){
