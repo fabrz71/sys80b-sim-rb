@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeLite_Workspace Name="sys80b-sim-rb" Database="" Version="10.0.0">
+  <BuildMatrix>
+    <WorkspaceConfiguration Name="Debug" Selected="yes">
+      <Environment/>
+    </WorkspaceConfiguration>
+    <WorkspaceConfiguration Name="Release" Selected="yes">
+      <Environment/>
+    </WorkspaceConfiguration>
+  </BuildMatrix>
+</CodeLite_Workspace>

@@ -1,0 +1,316 @@
+/* *** Gottileb System 80/B SIM PRB ***
+* (SIMulation Pinball Replacement control Board)
+* software for Teensy 3.x board developed with Arduino IDE
+* under GNU General Public Livence v3
+* ---
+* SYSTEM/80B MENU USER INTERFACE
+* ---
+* Pinball menu user interface implementation.
+*/
+
+#include "uiMenu.h"
+
+#include <string.h>
+//#include "Light.h"
+#include "displFX.h"
+#include "nvData.h"
+#include "Sys80b.h"
+
+char mbuf[30];
+menuItem *currentMenu;
+char *menuName, *itemName;
+byte mdepth, mitem, itemId, menuId;
+byte mpath[MAX_MENU_DEPTH];
+bool _itemIsSubMenu;
+bool _menuIsDynamic;
+byte settVal;
+bool _menuTaskExecution;
+
+extern Light light[];
+
+extern bool isSpecialLamp(byte lamp);
+
+void initMenu() {
+	_home();
+	_menuTaskExecution = false;
+	setDisplayBlink(0, false);
+	setDisplayBlink(1, false);
+	_updMenuDisplay();
+}
+
+void execMenuCmd(menuEvent me) {
+	switch (me) {
+	case MENU_BACK:
+		_menuBack();
+		break;
+	case MENU_NEXT:
+		_nextItem();
+		break;
+	case MENU_ENTER:
+		if (_itemIsSubMenu) _menuForward(true);
+		else _doMenuItem(menuId, mitem);
+		break;
+	default:
+		return;
+	}
+	_updMenuDisplay();
+}
+
+// updates attributes: _dymanicMenu [, currentMenu, menuName]
+// based on: currentMenu
+void _home() {
+	mdepth = 0;
+	menuId = 0;
+	currentMenu = (menuItem*)mainMenu;
+	menuName = (char*)mainMenuName;
+	_menuIsDynamic = false;
+	mitem = 0;
+	settVal = 0xff;
+	__updItemVars();
+}
+
+// updates attributes: currentItem, itemName, _itemIsIsubMenu, _itemIsDynamic, itemId
+// based on: currentMenu, mitem
+void __updItemVars() {
+	if (_menuIsDynamic) { // dynamic items
+		itemName = _getSpecialItemName(menuId, mitem);
+		_itemIsSubMenu = false;
+		itemId = 0xff;
+	}
+	else { // standard items
+		_itemIsSubMenu = (currentMenu[mitem].subMenu != NULL);
+		itemName = (char*)currentMenu[mitem].text;
+		itemId = (byte)currentMenu[mitem].id;
+	}
+}
+
+void _nextItem() {
+	++mitem;
+	if (!_menuIsDynamic && currentMenu[mitem].text == NULL) mitem = 0; // no more items
+	__updItemVars();
+}
+
+void _menuForward(bool rememberPath) {
+	if (mdepth >= MAX_MENU_DEPTH) return; // max depth reached
+	if (rememberPath) mpath[mdepth++] = mitem;
+	settVal = 0xff;
+	if (currentMenu[mitem].isSetting)
+		settVal = _getSettingsItem(currentMenu[mitem].id);
+	menuName = itemName;
+	menuId = itemId;
+	_menuIsDynamic = (currentMenu[mitem].subMenu == _dynamicItems);
+	currentMenu = (menuItem*)currentMenu[mitem].subMenu;
+	if (settVal == 0xff) mitem = 0; else mitem = settVal;
+	__updItemVars();
+}
+
+void _menuBack() {
+	byte i;
+
+	if (mdepth < 1) return;
+	mdepth--;
+	// restore upper menu
+	menuId = 0;
+	menuName = (char*)mainMenuName;
+	_menuIsDynamic = false;
+	currentMenu = (menuItem*)mainMenu;
+	mitem = mpath[0];
+	__updItemVars();
+	for (i = 0; i<mdepth; i++) {
+		_menuForward(false);
+		mitem = mpath[i + 1];
+	}
+	__updItemVars();
+}
+
+void _updMenuDisplay() {
+	setDisplayText(0, menuName);
+	setDisplayText(1, itemName);
+	setDisplayBlink(1, mitem == settVal);
+}
+
+byte _getSettingsItem(byte iid) {
+	byte r;
+
+	switch (iid) {
+	case 0x11: // left coin chute
+	case 0x12: // center coin chute
+	case 0x13:// right coin chute
+		r = getSettingByte(iid - 11) & 0x1f;
+		break;
+	case 0x14: // reset high score ...
+	case 0x15: // attract mode
+	case 0x16: // auto percentage mode
+		r = getSettingSwitch(iid - 8);
+		break;
+	case 0x17: // captured ball control
+		r = getSettingSwitch(14);
+		break;
+	case 0x18: // maximum credits
+		r = getSettingSwitch(15) | ((getSettingSwitch(16) << 1));
+		break;
+	case 0x19: // playfield special
+		r = getSettingSwitch(22);
+		break;
+	case 0x1a:
+		r = getSettingSwitch(23) | ((getSettingSwitch(24) << 1));
+		break;
+	case 0x1b:
+	case 0x1c:
+	case 0x1d:
+		r = getSettingSwitch(iid + 13);
+		break;
+	case 0x1e:
+	case 0x1f:
+		r = getSettingSwitch(iid + 15);
+		break;
+	default:
+		r = 0xff; // null value
+		break;
+	}
+	return r;
+}
+
+void _setSettingsItem(byte iid, byte val) {
+	switch (iid) {
+	case 0x11: // left coin chute
+	case 0x12: // center coin chute
+	case 0x13:// right coin chute
+		saveSettingByte((byte)(iid - 0x11), (byte)0x00011111, val);
+		break;
+	case 0x14: // reset high score ...
+	case 0x15: // attract mode
+	case 0x16: // auto percentage mode
+		setSettingSwitch(iid - 8, val);
+		break;
+	case 0x17: // captured ball control
+		setSettingSwitch(14, val);
+		break;
+	case 0x18: // maximum credits
+		setSettingSwitch(15, val & 1);
+		setSettingSwitch(16, val & 2);
+		break;
+	case 0x19: // playfield special
+		setSettingSwitch(22, val);
+		break;
+	case 0x1a:
+		setSettingSwitch(23, val & 1);
+		setSettingSwitch(24, val & 2);
+		break;
+	case 0x1b:
+	case 0x1c:
+	case 0x1d:
+		setSettingSwitch(iid + 13, val);
+		break;
+	case 0x1e:
+	case 0x1f:
+		setSettingSwitch(iid + 15, val);
+		break;
+	}
+}
+
+void _doMenuItem(byte iid, byte val) {
+	uint16_t res;
+
+	// SIMPLE SETTINGS
+	if (iid >= 0x11 && iid <= 0x1f) {
+		settVal = val;
+		_setSettingsItem(iid, val);
+		setDisplayBlink(1, true);
+		return;
+	}
+
+	// SPECIAL FUNCTIONS
+	if (iid >= 0x21 && iid <= 0x26) {
+		switch (iid) {
+		case 0x21: // lamps tests
+			light[val].blink(LAMP_TEST_BLINK_P, 3);
+			break;
+		case 0x22: // solenoid tests
+			setSolenoid(val, true, SOL_TEST_ON_TIME);
+			break;
+		case 0x23: // special lamps test
+			light[val].blink(SOL_TEST_ON_TIME, 1);
+			break;
+		case 0x24: // sounds test
+			setSound(val);
+			break;
+		}
+		return;
+	}
+
+	// BOOKKEEPING INFOS
+	if (iid >= 0x31 && iid <= 0x3f) {
+		switch (iid) {
+		case 0x31: // left chute coins
+		case 0x32: // center chute coins
+		case 0x33: // right chute coins
+		case 0x34: // total plays
+		case 0x35: // total replays
+		case 0x36: // replay percentage
+		case 0x37: // extra balls
+		case 0x38: // total tilts
+		case 0x39: // specials
+			res = getStat16(2 + (itemId - 0x31) * 2);
+			break;
+		case 0x3a: // times highest game to date awarded
+			res = getStat8(20);
+			break;
+		case 0x3b: // 1st high score level
+		case 0x3c: // 2nd high score level
+		case 0x3d: // 3rd high score level
+			res = getStat32(22 + (itemId - 0x3b) * 4);
+			break;
+		case 0x3e: // top score
+			res = getStat32(36);
+			break;
+		case 0x3f: // average playing score
+			res = getStat16(34);
+			break;
+		default:
+			res = 0;
+		}
+		sprintf(mbuf, "%d", res);
+		setDisplayText(0, mbuf);
+		return;
+	}
+}
+
+char *_getSpecialItemName(byte &mid, byte &n) {
+	mbuf[0] = 0;
+	switch (mid) {
+	case 0x11: // credits/coins settings
+	case 0x12:
+	case 0x13:
+		if (n > 24) n = 0;
+		sprintf(mbuf, "%d CREDITS / %d COINS", credits_ratio[n], coins_ratio[n]);
+		break;
+	case 0x18: // max credits
+		if (n > 3) n = 0;
+		sprintf(mbuf, "UP TO %d CREDITS", max_credits[n]);
+		break;
+	case 0x21: // lamps
+		if (n > 47) n = 0;
+		while (isSpecialLamp(n)) n++;
+		sprintf(mbuf, "LAMP #%d", n);
+		light[n].blink(LAMP_TEST_BLINK_P, 3);
+		break;
+	case 0x22: // special lamps
+		if (n > 47) n = 0;
+		while (!isSpecialLamp(n)) if (++n > 47) n = 0;
+		sprintf(mbuf, "SPECIAL LAMP #%d", n);
+		break;
+	case 0x23:// solenBits
+		if (n > 8) n = 0;
+		sprintf(mbuf, "SOLENOID #%d", n + 1);
+		break;
+	case 0x24: // sounds
+		if (n > 31) n = 0;
+		sprintf(mbuf, "SOUND #%d", n);
+		break;
+	default:
+		sprintf(mbuf, "---");
+		break;
+	}
+	return mbuf;
+}
