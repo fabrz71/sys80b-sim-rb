@@ -1,240 +1,259 @@
-/* *** Gottileb System 80/B SIM PRB ***
-* (SIMulation Pinball Replacement control Board)
-* software for Teensy 3.2 board developed with Arduino IDE
-* under GNU General Public Livence v3
-* by Fabrizio Volpi (fabvolpi@gmail.com)
-* ---
-* SYSTEM 80/B I/O FUNCTIONS
-* ---
-* Defines a System 80/B architecture, keeping states of
-* solenoids, lamps, sound buffer, display and switches.
-* Implements higher level System 80/B I/O functions but does not
-* directly act on hardware:
-* All input/output commands are issued exclusively through
-* BoardIO::setOuput() and BoardIO::getInput() functions, and would
-* be effectively executed only when the class instance is pointed by
-* BoardIO::connectedSystem.
-*/
-
 #include "Sys80b.h"
 
-using namespace BoardIO;
+//#include "SolenoidSet.h"
 
-Sys80b::Sys80b() {
-	// virtual objects instantiation
-	solenoids = SolenoidSet(10); // real solenoids (0..9) (0 = unused)
-	lampSolenoids = SolenoidSet(16); // "lamp" solenoids (16..31)
-	lamps = LampSet(LAMPS_COUNT);
-	sound = SoundBuff(8);
+Sys80b::Sys80b(Board_Sys80b& board) {
+	Serial.println("Sys80b init...");
+	//delay(100);
+	hw = &board;
+	msg = &(board.msg);
+	solenoids = new SolenoidSet(SOLENOID_COUNT); // solenoids (numbers: 1..9)
+	//lampSolenoids = new SolenoidSet(16); // "lamp" solenoids (16..31)
+	lamps = new BitMappedSet(LAMPS_COUNT);
+	slamSwitchNormalState = true;
+	slamSwitchLastState = slamSwitchNormalState;
+	//hw = nullptr;
+	//reset();
+}
 
+Sys80b::~Sys80b() {
+	delete solenoids;
+	delete lamps;
 }
 
 // reset all outputs to 0
 void Sys80b::reset() {
-
-	// sound and display reset
-	setOutput(this, DS_RESET, 0); 
+	msg->outln(F("Sys80b reset..."));
 	delay(100);
-	setOutput(this, DS_RESET, 1);
-	sound.Empty();
-	setOutput(this, SOUND, 0xff); // reset sound output (active low)
-	displ.clear();
-	displ.reset();
 
-	// other machine setup
-	switchGrid.strobe = 0;
-	setOutput(this, STROBES, 0xff); // reset strobes output (active low)
-	solenoids.resetAll();
-	setOutput(this, SOLENOIDS, 0);
-	lamps.resetAll();
+	hw->outputReset();
+	lamps->reset();
+	solenoids->resetAll();
+	soundBuffer.Clear();
+	currentLampGroup = 0;
+	display.reset();
+	_soundPendingCmd = false;
+	//_changedSwitchNum = 0xff;
+	slamSwitchLastState = slamSwitchNormalState;
+}
+
+byte Sys80b::getBallsCount() {
+	return (hw->getSettingSwitch(25) == 1) ? 3 : 5;
+	//return 3; // TODO
 }
 
 // sets a solenoid state, updating internal variables
-// note:
-// n = [1..9] standard solenoid
-// n = [10..15] no effect
-// n = [16..31] "lamp" solenoid 0..15
+// n = [1..9]
 void Sys80b::setSolenoid(byte n, bool active) {
-	if (n < 1 || n > 32 || (n > 9 && n < 16)) return;
-	if (n <= 9) { // real solenoid
-		uint16_t sol = solenoids.set(n, active);
-		setOutput(this, SOLENOIDS, sol);
-	}
-	else { // "lamp" solenoid
-		lampSolenoids.set(n & 0xf, active);
-		lamps.setLamp(n & 0xf, active);
-	}
+	if (n < 1 || n > 9) return;
+	solenoids->setState(n-1, active);
+	hw->writeSolenoids(solenoids->getStates());
 }
 
-// sets a solenoid state, defining active period.
-// actPeriod updates solenoid attribute also when active = false
-inline void Sys80b::activateSolenoid(byte n, uint16_t actPeriod) {
-	activateSolenoidDelayed(n, actPeriod, 0);
-}
-
-// sets a solenoid state, defining switch delay:
+// sets a solenoid state, defining switch delay and active _period:
 // solenoid state will switch after the specified delay.
-inline void Sys80b::activateSolenoidDelayed(byte n, uint16_t swDelay) {
-	activateSolenoidDelayed(n, 0, swDelay);
-}
-
-// sets a solenoid state, defining switch delay and active period:
-// solenoid state will switch after the specified delay.
-inline void Sys80b::activateSolenoidDelayed(byte n, uint16_t actPeriod, uint16_t swDelay) {
-	if (n < 1 || n > 32 || (n > 9 && n < 16)) return;
-	if (n <= 9) solenoids.activateDelayed(n, actPeriod, swDelay);
-	else lampSolenoids.activateDelayed(n, actPeriod, swDelay);
+// n = [1..9]
+ void Sys80b::activateSolenoid(byte n, uint16_t actPeriod, uint16_t swDelay) {
+	//Serial.printf("activateSolenoid(%d, %d, %d)\n",n, actPeriod, swDelay);
+	if (n < 1 || n > 9) return;
+	if (actPeriod == 0) actPeriod = SOL_DEF_TIME;
+	solenoids->activate(n-1, actPeriod, swDelay);
+	hw->writeSolenoids(solenoids->getStates());
 }
 
 // checks whether:
 // - delay activation time elapsed (when delayedSwitch = true)
 // - maximum active time elapsed for safe switch-off
-inline void Sys80b::checkSolenoids(uint32_t t) {
-	if (solenoids.check(t)) setOutput(this, SOLENOIDS, solenoids.getBits());
-	if (lampSolenoids.check(t)) {
-		byte sol = lampSolenoids.getLastChanged();
-		lamps.setLamp(sol + 16, lampSolenoids.isActive(sol));
+ void Sys80b::checkSolenoids(uint32_t& t) {
+	if (solenoids->update(t)) hw->writeSolenoids(solenoids->getStates());
+}
+
+// snd = 0..31
+ void Sys80b::setSound(byte snd) {
+	//soundBuffer.sendCmd(snd);
+	soundBuffer.put(snd);
+	_soundPendingCmd = true;
+}
+
+// uint16_t Sys80b::pullSoundCmd() {
+//	return (soundBuffer.isEmpty()) ? 0 : soundBuffer.get();
+//}
+
+byte Sys80b::incrementStrobe() {
+	byte strb = switchGrid.incrementStrobe();
+	hw->writeStrobes(~(byte)(1u<<strb)); // strobe advance (inverted)
+	return strb;
+}
+
+// Stores returns states in <_returnsInput> variable
+// updating internal SwitchGrid8x8 object attributes.
+// Returned value is also stored internally and readable
+// through getChangedSwitch() function.
+// returns: true in case of changes detected on current return  line
+bool Sys80b::acquireReturns(uint32_t& t) {
+	_returnsInput = (byte)~(hw->readReturns()); // read actual switch returns on current strobe line (inverted)
+	return (switchGrid.setCurrentRow(_returnsInput, t) > 0);
+}
+
+// Gets next sequencial data to send to display and forwards each byte to its 
+// correspondig line.
+// If data contains a byte routed to both rows, it will be forwarded only once.
+void Sys80b::feedDisplay() {
+	uint16_t dd; // display control + data
+	byte dc; // display control code: 1 = row 1; 2 = row 2; 3 = both rows
+	byte db; // display data (8-bit);
+
+	for (int i = 0; i < 2; i++) { // 1 iteration only in case dc == 3
+		dd = display.getNextDisplayData();
+		dc = (byte)((dd & 0x300) >> 8);
+		db = (byte)(dd & 0xff);
+		hw->writeDisplayData(db); // updates 8-bit data bus
+		if (dc & 1u) hw->writeDisplayLD1(HIGH); // LD on
+		if (dc & 2u) hw->writeDisplayLD2(HIGH);
+		delayMicroseconds(11);
+		if (dc & 1u) hw->writeDisplayLD1(LOW); // LD off
+		if (dc & 2u) hw->writeDisplayLD2(LOW);
+		if (dc == 3u) break; // CMD for both rows has already been sent
+		if (i == 0) delayMicroseconds(100); // only after first iteration
 	}
+
 }
 
-// setPeriod a lamp on or off, with status memory
-inline void Sys80b::setLamp(byte n, bool state) {
-	lamps.setLamp(n, state);
-}
+// Real lamps update routine.
+// Updates 1 consecutive group of 4 lamps for each call.
+// Returns true in case of effective update forwarded.
+bool Sys80b::renderNextLampsGroup() {
+	byte i;
 
-// setPeriod a lamp on or off, with status memory
-inline void Sys80b::setLamp(byte n, byte state) {
-	lamps.setLamp(n, state > 0);
-}
-
-inline void Sys80b::set4Lamps(byte set, byte states) {
-	lamps.setGroup(set, states);
-}
-
-inline bool Sys80b::readLamp(byte n) {
-	return lamps.getLamp(n);
-}
-
-// switch all lamps off
-inline void Sys80b::resetLamps() {
-	lamps.resetAll();
-}
-
-// to call periodically for real lamps update
-// updates a group of 4 lamps for each call
-bool Sys80b::updateLights() {
-	byte i = 0;
-	bool changeHit = false;
-
-	while (i++ < 12 && !changeHit) {
-		if (++updLampGroup >= 12) updLampGroup = 0;
-		changeHit = lamps.isGroupChanged(updLampGroup);
+	for (i = 0; i < 12; i++) { // search next not-updated group
+		if (lamps->getChanges4(currentLampGroup) > 0) break;
+		if (++currentLampGroup >= 12) currentLampGroup = 0;
 	}
-	if (changeHit) {
-		//BoardIO::write4Lamps(updLampGroup, lamps.getGroup[updLampGroup]);
-		setOutput(this, LAMPS, updLampGroup << 4 | lamps.getGroup[updLampGroup]);
-		lamps.validateGroup(updLampGroup);
+	if (i < 12) { // pending update
+		hw->write4Lamps(currentLampGroup, lamps->getStates4(currentLampGroup));
+		lamps->clearChanges4(currentLampGroup);
+		return true;
+	}
+	//clearLampsOutput();
+	return false;
+}
+
+// Updates a group of 4 lamp.
+// Returns true in case of effective update forwarded.
+bool Sys80b::renderLampsGroup(byte lg) {
+	if (lamps->getChanges4(lg) > 0) { // pending changes ?
+		hw->write4Lamps(lg, lamps->getStates4(lg));
+		lamps->clearChanges4(lg);
 		return true;
 	}
 	return false;
 }
 
-// snd = 0..31
-inline void Sys80b::setSound(byte snd) {
-	sound.sendCmd(snd);
-	// light #4 sound16 update
-	lamps.setLamp(4, (snd & 0x10) > 0);
+ void Sys80b::updateSound() {
+	 if (!_soundPendingCmd) return;
+	 byte s = soundBuffer.isEmpty() ? 0 : soundBuffer.get();
+	 hw->writeSound(~(s & 0x7f)); // only bits 0..6, not the 7th bit
+	 _soundPendingCmd = !(soundBuffer.isEmpty() && s == 0);
+ }
+
+void Sys80b::updUserKeyState(UserKey key, uint32_t& ms) {
+	if (key != _keyPressed) {
+		_keyPressed = key;
+		_keyStartTime = ms;
+		_keyRepeat = false;
+		if (key != NO_KEY) onButtonPressed(key);
+	}
 }
 
-inline void Sys80b::checkSoundCmd(uint32_t t) {
-	byte snd = sound.getNextSndOutput(t);
-	setOutput(this, SOUND, ~snd);
+void Sys80b::_onSwitchEvent(byte sw, bool st, uint32_t& ms) {
+	String str;
+
+	str = "switch ";
+	str += sw;
+	str += (st ? " closed" : " opened");
+	msg->outln(str);
+
+	// user buttons
+	if (sw == LEFTADV_KEY || sw == RIGHTADV_KEY || sw == REPLAY_KEY) {
+		UserKey key;
+		switch (sw) {
+		case LEFTADV_SW:
+			key = LEFTADV_KEY;
+			str = "LEFT";
+			break;
+		case RIGHTADV_SW:
+			key = RIGHTADV_KEY;
+			str = "RIGHT";
+			break;
+		case REPLAY_SW:
+			key = REPLAY_KEY;
+			str = "REPLAY";
+			break;
+		default:
+			key = NO_KEY;
+			str = "<unknown>";
+		}
+		updUserKeyState(st ? key : NO_KEY, ms);
+		str = "Key " + str;
+		str += (st ? " pressed" : " released");
+		msg->outln(str);
+		return;
+	}
+
+	// TEST button
+	if (sw == TEST_SW) {
+		onTestButtonPressed();
+		return;
+	}
 }
 
-// setPeriod one of eight strobes bit to 0 (active low)
-// n = 0..7
-inline void Sys80b::setStrobe(byte n) {
-	setOutput(this, STROBES, ~bit(n) & 0xff);
-}
-
-inline bool Sys80b::readSwitch(byte swNum) {
-	return switchGrid.getSwitch(swNum);
-}
-
-// 1. reads returns on current strobe line
-// 2. call special subroutine on any switch open/close event (with debounce function)
-// 3. increments strobe line for next read
-// returns: changed switches on strobe line (unbounced), packed in a byte
-byte Sys80b::getNextReturns(uint32_t t) {
-	byte i, ret, diff, bv, sw;
-	byte stbx8;
-
-	ret = (byte)~getInput(this, RETURNS); // read actual switch returns on current strobe line (inverted)
-	diff = switchGrid.setRow(switchGrid.strobe, ret, t); // any changes ? (with unbounce effect)
-	if (diff) { // changes detected
-		stbx8 = switchGrid.strobe << 3; // strobe * 8
-		bv = 0; // bit decimal balue
-		for (i = 0; i<8; i++) { // for every bit...
-			if (diff & bv) { // switch has changed ?
-				sw = stbx8 | i; // switch number = strobe * 8 + return
-				if (ret & bv) game->onEvent(sw, true); // switch has closed
-				else game->onEvent(sw, false); // switch has opened
+void Sys80b::_checkPressedKey(uint32_t& ms) {
+	if (_keyPressed != NO_KEY) {
+		if (!_keyRepeat) {
+			if (ms - _keyStartTime >= KEY_REPEAT_TIMER) {
+				_keyRepeat = true;
+				_keyStartTime = ms;
+				onButtonPressed(_keyPressed);
 			}
-			bv <<= 1;
+		}
+		else { // repeating key
+			if (ms - _keyStartTime >= KEY_REPEAT_PERIOD) {
+				_keyStartTime = ms;
+				onButtonPressed(_keyPressed);
+			}
 		}
 	}
-	setOutput(this, STROBES, ~bit(switchGrid.incrementStrobe())); // strobe advance (inverted)
-	return ret;
+	else _keyRepeat = false;
 }
 
-// Gets next sequencial data to send to display and send ("push") each byte to its 
-// correspondigs row.
-// If data contains a byte routed to both rows, it will be pushed only at once.
-void Sys80b::feedDisplay() {
-	uint16_t dd; // display control + data
-	byte dc; // display control code only
+// Periodic update and output routine, to be
+// called every millisecond.
+// Returns true when an input change has detected:
+// either a switch from grid or the slam switch.
+// In case of change detection, use getChangesSwitch()
+// to get the event.
+void Sys80b::_millisRoutine(uint32_t& ms) {
+	
+	renderNextLampsGroup();
+	updateSound();
+	checkSolenoids(ms);
+	feedDisplay();
+	// /* if (display.isLastPosition()) */ display.update(ms);
+	
+	bool slsw = hw->readSlamSw();
+	if (slsw != slamSwitchLastState) {
+		onSlamSwitchEvent(slamSwitchNormalState ? !slsw : slsw); // code from superclass
+		slamSwitchLastState = slsw;
+	}
 
-	// FIRST OR BOTH DISPLAYS
-	dd = displ.getNextDisplayData(); // row 0
-	dc = (byte)((dd & 0x300) >> 8);
-	setOutput(this, DISPL_DATA, dd & 0xff);
-	setOutput(this, DISPL_ADDR, dc);
-	delayMicroseconds(10);
-	setOutput(this, DISPL_ADDR, dc);
+	if (acquireReturns(ms)) { // any changes?
+		byte sw = switchGrid.getLastChangedSwitch();
+		bool st = switchGrid.getLastChangedSwitchState();
+		switchGrid.clearLastSwitchChanged();
+		_onSwitchEvent(sw, st, ms);
+		onSwitchEvent(sw, st); // virtual function: code provided by superclass
+	}
+	incrementStrobe();
 
-	//if ((dd & 0x0300) == 0x0300) return; // CMD for both lines has already been sent
-	if (dc == 3) return; // CMD for both rows has already been sent
-	delayMicroseconds(100);
-
-	// SECOND DISPLAY
-	dd = displ.getNextDisplayData(); // row 1
-	//BoardIO::writeDisplayData((byte)(dd & 0xff));
-	//BoardIO::writeDisplayLD2(HIGH);
-	//delayMicroseconds(10);
-	//BoardIO::writeDisplayLD2(LOW);
-	dc = (byte)((dd & 0x300) >> 8);
-	setOutput(this, DISPL_DATA, dd & 0xff);
-	setOutput(this, DISPL_ADDR, dc);
-	delayMicroseconds(10);
-	setOutput(this, DISPL_ADDR, dc);
-}
-
-inline bool Sys80b::isSpecialLamp(byte lamp) {
-	return false;
-}
-
-inline void Sys80b::setQrelay(bool s) {
-	setLamp(0, s);
-}
-
-inline void Sys80b::setTrelay(bool s) {
-	setLamp(1, s);
-}
-
-inline void Sys80b::setArelay(bool s) {
-	setLamp(14, s);
-}
-
-void Sys80b::timerFunction(uint32_t tm, int id) {
-	// TODO
+	_checkPressedKey(ms);
 }

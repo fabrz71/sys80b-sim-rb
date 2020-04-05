@@ -1,224 +1,266 @@
-/* *** Gottileb System 80/B SIM PRB ***
-* (SIMulation Pinball Replacement control Board)
-* software for Teensy 3.x board developed with Arduino IDE
-* under GNU General Public Livence v3
-* ---
-* LIGHT SET OBJECT DEFINITION
-* ---
-* A "Light setPeriod" are a setPeriod of game lighs of a group.
-* Contains C++ code.
-*/
-
 #include "LightGroup.h"
+#include "LightSet.h"
 
-//#include "LightSet.h"
+LightSet* LightGroup::activeLightSet = nullptr;
 
-LightGroup::LightGroup() {
-	nameStr = "";
+//LightGroup::LightGroup() {
+//	nameStr = "";
+//	_tmpLight = new Light();
+//	_size = 0;
+//}
+
+LightGroup::LightGroup(const char* setName, int32_t lNumber ...) {
+	_size = 0; 
+	_tmpLight = new Light();
+	int32_t* ip = &lNumber;
+	while (*(ip++) != -1) _size++;
+	lightNum = new byte[_size];
+	ip = &lNumber;
+	for (byte i = 0; i < _size; i++) lightNum[i] = (byte)*(ip+i);
+	nameStr = String(setName);
+
+	//Serial.printf("new light group (size:%i) '", _size);
+	//Serial.print(nameStr);
+	//Serial.print("':[");
+	//for (int i = 0; i < _size; i++) Serial.printf("%i,",lightNum[i]);
+	//Serial.println("]");
+}
+
+LightGroup::LightGroup(String setName, int32_t lNumber ...) {
 	_size = 0;
+	int32_t* ip = &lNumber;
+	while (*(ip++) != -1) _size++;
+	lightNum = new byte[_size];
+	ip = &lNumber;
+	for (byte i = 0; i < _size; i++) lightNum[i] = (byte) * (ip + i);
+	nameStr = setName;
+
+	//Serial.printf("created light group (size:%i) '", _size);
+	//Serial.print(nameStr);
+	//Serial.print("':[");
+	//for (int i = 0; i < _size; i++) Serial.printf("%i,", lightNum[i]);
+	//Serial.println("]");
 }
 
-//LightGroup::LightGroup(const char *setName, const byte *lightNumber, byte arrayLength) {
-//	nameStr = setName;
-//	lightNum = (byte *)lightNumber;
-//	if (arrayLength > MAX_SIZE) arrayLength = MAX_SIZE;
-//	_size = arrayLength;
-//	//printf("* new LightGroup '%s' defined with %d lamps.\n", setName, _size);
-//}
-
-//LightGroup::LightGroup(const char *setName, const byte *lightNumber) {
-//	for (_size = 0; _size < MAX_SIZE; _size++)
-//		if (lightNumber[_size] == 0) break;
-//	nameStr = setName;
-//	lightNum = (byte *)lightNumber;
-//	//printf("* new LightGroup '%s' defined with %d lamps.\n", setName, _size);
-//}
-
-// TODO: DA VERIFICARE!
-LightGroup::LightGroup(const char *setName, byte lNumber ...) {
-	byte *p = &lNumber;
-	byte nargs = lNumber;
-
-	//p++;
-	if (nargs > MAX_SIZE) nargs = MAX_SIZE;
-	lightNum = new byte[nargs];
-	for (byte i = 0; i < nargs; i++) lightNum[i] = *(++p);
-	_size = nargs;
+// returns nullptr if no light context is defined in <activeLightSet>
+ Light* LightGroup::light(byte n) {
+	 if (activeLightSet == nullptr) {
+		 Serial.println(F("LightGroup::light: undefined light set"));
+		 delay(100);
+		 return nullptr;
+	 }
+	 Light* l = activeLightSet->getLight(lightNum[n]);
+	 if (l == nullptr) {
+		 Serial.println(F("LightGroup::light: null light!"));
+		 delay(100);
+	 }
+	 return l;
 }
 
-//LightGroup::LightGroup(const char *setName, const byte l1, const byte l2) {
-//	nameStr = setName;
-//	_size = 2;
-//	lightNum = new byte[_size];
-//	lightNum[0] = l1;
-//	lightNum[1] = l2;
-//}
-//
-//LightGroup::LightGroup(const char *setName, const byte l1, const byte l2, const byte l3) {
-//	nameStr = setName;
-//	_size = 3;
-//	lightNum = new byte[_size];
-//	lightNum[0] = l1;
-//	lightNum[1] = l2;
-//	lightNum[2] = l3;
-//}
-//
-//LightGroup::LightGroup(const char *setName, const byte l1, const byte l2, const byte l3, const byte l4) {
-//	nameStr = setName;
-//	_size = 4;
-//	lightNum = new byte[_size];
-//	lightNum[0] = l1;
-//	lightNum[1] = l2;
-//	lightNum[2] = l3;
-//	lightNum[3] = l4;
-//}
-//
-//LightGroup::LightGroup(const char *setName, const byte l1, const byte l2, const byte l3, const byte l4, const byte l5) {
-//	nameStr = setName;
-//	_size = 5;
-//	lightNum = new byte[_size];
-//	lightNum[0] = l1;
-//	lightNum[1] = l2;
-//	lightNum[2] = l3;
-//	lightNum[3] = l4;
-//	lightNum[4] = l5;
-//}
-
-//inline Light* LightGroup::Light(byte n) {
-//	return refLightSet->getLight(lightNum[n]);
-//}
-
-// returns NULL if no light context is defined in <refLightSet>
-inline Light* LightGroup::Light(byte n) {
-	//if (refLightSet == NULL) return NULL;
-	return &(refLightSet[lightNum[n]]);
+void LightGroup::set(byte n, lightState st) {
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::set: undefined light set!"));
+		delay(100);
+		return;
+	}
+	if (n >= _size) {
+		Serial.println(F("LightGroup::set: illegal light number"));
+		delay(100);
+		return;
+	}
+	light(n)->set(st);
 }
 
-void LightGroup::setLight(byte n, lightState st) {
-	if (refLightSet == NULL || n >= _size) return;
-	Light(n)->set(st);
-}
-
-void LightGroup::setLight(byte n, lightState st, uint16_t blinkP) {
-	if (refLightSet == NULL || n >= _size) return;
-	Light(n)->set(st, blinkP, 50);
+void LightGroup::blink(byte n, uint16_t blinkP, byte ticks) {
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::set: undefined light set!"));
+		delay(100);
+		return;
+	}
+	if (n >= _size) {
+		Serial.println(F("LightGroup::set: illegal light number"));
+		delay(100);
+		return;
+	}
+	light(n)->blink(blinkP, 50, ticks);
 }
 
 void LightGroup::invert(byte n) {
-	if (refLightSet == NULL || n >= _size) return;
-	Light(n)->invert();
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::invert: undefined light set!"));
+		delay(100);
+		return;
+	}
+	light(n)->invert();
 }
 
 void LightGroup::pulse(byte n, uint16_t tm) {
-	if (refLightSet == NULL || n >= _size) return;
-	Light(n)->pulse(tm);
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::pulse: undefined light set!"));
+		delay(100);
+		return;
+	}
+	light(n)->pulse(tm);
 }
 
-lightState LightGroup::getLState(byte n) {
-	if (refLightSet == NULL || n >= _size) return OFF_L;
-	return Light(n)->state;
+lightState LightGroup::getState(byte n) {
+	if (activeLightSet == nullptr || n >= _size) return OFF_L;
+	return light(n)->state;
 }
 
-inline bool LightGroup::isActive(byte n) {
-	if (refLightSet == NULL || n >= _size) return false;
-	return Light(n)->isActive();
+bool LightGroup::isActive(byte n) {
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::isActive: undefined light set!"));
+		delay(100);
+		return false;
+	}
+	if (n >= _size) {
+		Serial.println(F("LightGroup::isActive: illegal light number"));
+		delay(100);
+		return false;
+	}
+	Light* l = light(n);
+	if (l == nullptr) {
+		Serial.printf(F("LightGroup::isActive: undefined light #%d\n"), n);
+		delay(100);
+		return false;
+	}
+	return l->isActive();
 }
 
 void LightGroup::setAll(lightState st) {
-	if (refLightSet == NULL) return;
-	for (int i = 0; i < _size; i++) Light(i)->set(st);
-}
-
-void LightGroup::setAll(lightState st, uint16_t blinkP) {
-	if (refLightSet == NULL) return;
-	for (int i = 0; i < _size; i++) Light(i)->set(st, blinkP, 50);
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::setAll: undefined light set!"));
+		delay(100);
+		return;
+	}
+	for (int i = 0; i < _size; i++) light(i)->set(st);
 }
 
 // switch the first light of the group of a different state than st
 // to the given state.
-// returns: the number of group-light switched; 0xFF else
-byte LightGroup::switchOne(lightState st) {
-	byte i, gl;
+// returns: the order number of light switched; 0xFF else
+byte LightGroup::switchTheFirst(lightState st) {
+	byte i;
 
-	if (refLightSet == NULL) return 0xff;
-	gl = 0xff;
-	i = 0;
-	while (i<_size) {
-		if (Light(i)->state != st) {
-			Light(i)->set(st);
-			gl = i;
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::switchTheFirst: undefined light set!"));
+		delay(100);
+		return 0xff;
+	}
+	for (i = 0; i < _size; i++) {
+		if (light(i)->state != st) {
+			light(i)->set(st);
 			break;
 		}
 	}
-	return gl;
+	return i;
 }
 
-byte LightGroup::switchOne(lightState st, uint16_t maxP) {
+byte LightGroup::switchTheFirst(lightState st, uint16_t maxP) {
 	byte gl;
-	gl = switchOne(st);
-	if (maxP > 0 && gl != 0xff) Light(gl)->activePeriod = maxP;
+	gl = switchTheFirst(st);
+	if (maxP > 0 && gl != 0xff) light(gl)->activePeriod = maxP;
 	return gl;
 }
 
 void LightGroup::setActivePeriod(byte n, uint16_t maxP) {
-	if (refLightSet == NULL || n >= _size) return;
-	Light(n)->activePeriod = maxP;
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::setActivePeriod: undefined light set!"));
+		delay(100);
+		return;
+	}
+	light(n)->activePeriod = maxP;
 }
 
 bool LightGroup::areAll(lightState st) {
 	byte n = 0;
-	if (refLightSet == NULL) return false;
-	while (n<_size && Light(n)->state == st) n++;
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::areAll: undefined light set!"));
+		delay(100);
+		return false;
+	}
+	while (n<_size && light(n)->state == st) n++;
 	return (n == _size);
 }
 
 void LightGroup::shiftRight() {
-	if (refLightSet == NULL) return;
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::shiftRight: undefined light set!"));
+		delay(100);
+		return;
+	}
 	if (_size < 1) return;
 	if (_size > 1) {
-		for (int i = _size - 1; i > 0; i--) Light(i + 1)->copy(Light(i));
+		for (int i = _size - 1; i > 0; i--) light(i + 1)->copy(light(i));
 	}
-	Light(0)->reset();
+	light(0)->reset();
 }
 
 void LightGroup::rotateRight() {
-	if (refLightSet == NULL) return;
-	if (_size <= 1) return;
-	//printf("rotateRight on group ");
-	//toString();
-	_tmpLight.copy(Light(_size - 1));
-	for (int i = _size - 2; i >= 0; i--) Light(i + 1)->copy(Light(i));
-	Light(0)->copy(_tmpLight);
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::rotateRight: undefined light set!"));
+		delay(100);
+		return;
+	}
+	if (_size <= 1) {
+		Serial.println(F("LightGroup::rotateRight: group size <= 1"));
+		delay(100);
+		return;
+	}
+	//Serial.print("rotateRight on group ");
+	//Serial.print(toString());
+	_tmpLight->copy(light(_size - 1));
+	for (int i = _size - 2; i >= 0; i--) light(i + 1)->copy(light(i));
+	light(0)->copy(_tmpLight);
+	//Serial.print(" -> ");
+	//Serial.println(toString());
 }
 
 void LightGroup::shiftLeft() {
-	if (refLightSet == NULL) return;
-	if (_size < 1) return;
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::shiftLeft: undefined light set!"));
+		delay(100);
+		return;
+	}
+	if (_size <= 1) {
+		Serial.println(F("LightGroup::rotateLeft: group size <= 1"));
+		delay(100);
+		return;
+	}
 	for (int i = 0; i < _size - 1; i++)
-		Light(i)->copy(Light(i + 1));
-	Light(_size - 1)->reset();
+		light(i)->copy(light(i + 1));
+	light(_size - 1)->reset();
 }
 
 void LightGroup::rotateLeft() {
-	if (refLightSet == NULL) return;
+	if (activeLightSet == nullptr) {
+		Serial.println(F("LightGroup::rotateLeft: undefined light set!"));
+		delay(100);
+		return;
+	}
 	if (_size <= 1) return;
-	//printf("rotateLeft on group ");
-	//toString();
-	_tmpLight.copy(Light(0));
-	for (int i = 0; i < _size - 1; i++) Light(i)->copy(Light(i + 1));
-	Light(_size - 1)->copy(_tmpLight);
+	//Serial.print("rotateLeft on group ");
+	//Serial.print(toString());
+	_tmpLight->copy(light(0));
+	for (int i = 0; i < _size - 1; i++) light(i)->copy(light(i + 1));
+	light(_size - 1)->copy(_tmpLight);
+	//Serial.print(" -> ");
+	//Serial.println(toString());
 }
 
-inline byte LightGroup::getSize() { 
+byte LightGroup::getSize() { 
 	return _size; 
 }
 
-void LightGroup::toString() {
+String LightGroup::toString() {
+	String str;
 	char c;
 
-	printf("%s:[", nameStr);
+	str = nameStr + ":[";
+	//printf("%s:[", nameStr.c_str);
 	for (int i = 0; i<_size; i++) {
-		switch (Light(i)->state) {
+		switch (light(i)->state) {
 		case OFF_L:
 			c = ' '; break;
 		case ON_L:
@@ -228,9 +270,14 @@ void LightGroup::toString() {
 		default:
 			c = '?'; break;
 		}
-		printf("%c", c);
+		str += c;
 	}
-	printf("] (%d", lightNum[0]);
-	for (int i = 1; i<_size; i++) printf(",%d", lightNum[i]);
-	printf(")\n");
+	str += "] (";
+	for (int i = 0; i < _size; i++) {
+		str += (int)lightNum[i];
+		if (i < _size-1) str += ",";
+	}
+	str += ")";
+	return str;
 }
+

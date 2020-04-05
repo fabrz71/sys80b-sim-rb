@@ -10,36 +10,47 @@
 * Contains C++ code.
 */
 
-//#pragma once
-
 #ifndef _TimerSet_h
 #define _TimerSet_h
 
-//#include "Arduino.h"
-
-#define MAX_TASKS 20
-
-class TimerTask;
+#include "Arduino.h"
+#include "TimerTask.h"
+//#define MAX_TASKS 20
 
 class TimerSet {
+public: 
+	static const int MAX_TASKS = 20;
+	String name;
 protected:
-	TimerTask *_first_timer;
-	TimerTask *_last_timer;
-	byte _count = 0;
+	TimerTask* _first_timer;
+	TimerTask* _last_timer;
+	byte _count;
+	int _nextTaskId;
 	uint32_t _chkTime;
 public:
 	TimerSet();
 	//~TimerSet();
-	bool add(TimerTask *tt);
-	bool rmv(TimerTask *tt);
-	bool contains(TimerTask *tt);
-	uint32_t checkTimerTasks();
+	//bool add(TimerTask& tt);
+	int add(TimerTask& tt);
+	int add(TimerTask* tt);
+	//TimerTask* addNewTask(TimerTaskExecutor* obj, uint32_t ms, bool periodic, byte taskId = 0);
+	//TimerTask* addNewTask(TimerTaskExecutor* obj, uint32_t ms, const char* name, byte taskId = 0);
+	int addNewTask(TimerTaskExecutor* obj, uint32_t ms, bool periodic = true, bool enabled = false);
+	int addNewTask(TimerTaskExecutor* obj, uint32_t ms, const char* name, bool enabled = false);
+	bool remove(TimerTask& tt);
+	bool contains(TimerTask& tt);
+	uint32_t update(uint32_t& tm);
 	//inline byte getLength() { return _count; }
+	TimerTask* getTask(int id);
 	byte getLength();
-	void enableAllTimers();
-	void disableAllTimers();
+	bool enableTask(int id);
+	bool disableTask(int id);
+	void enableAllTasks();
+	void disableAllTasks();
 	//uint32_t getNextEventRemainingTime();
 	void print();
+protected:
+	int nextTaskId();
 };
 
 #endif

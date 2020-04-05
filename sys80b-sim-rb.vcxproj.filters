@@ -21,18 +21,6 @@
     <ClInclude Include="__vm\.sys80b-sim-rb.vsarduino.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Display.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ioPins.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="LampSet.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Led8x8.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Light.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -42,31 +30,10 @@
     <ClInclude Include="LightSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="msgOutput.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="nvData.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="PIO.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Player.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="sdio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sdops.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Solenoid.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="SolenoidSet.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SoundBuff.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Sys80b.h">
@@ -78,48 +45,48 @@
     <ClInclude Include="TimerTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="uiMenu.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="BigHouse.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="BoardIO.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="SwitchGrid8x8.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Sys80b_Driver.h">
+    <ClInclude Include="Sys80b_Display.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DisplayWithFX.h">
+    <ClInclude Include="Buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Game.h">
+    <ClInclude Include="TextDisplay.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Timer.h">
+    <ClInclude Include="ExtTextDisplay.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="TimerClient.h">
+    <ClInclude Include="BitMappedSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="PinHW.h">
+    <ClInclude Include="TestModule.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uiMenu.h.old">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Sys80b_Sensor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Sys80b_Actuator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CmdExecutor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PinGame.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BigHouse.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Display.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="LampSet.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Led8x8.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Light.cpp">
@@ -131,28 +98,7 @@
     <ClCompile Include="LightSet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="msgOutput.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="nvData.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="PIO.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Player.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="sdio.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Solenoid.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="SolenoidSet.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SoundBuff.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Sys80b.cpp">
@@ -164,31 +110,37 @@
     <ClCompile Include="TimerTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="BoardIO.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="SwitchGrid8x8.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="uiMenu.cpp">
+    <ClCompile Include="Sys80b_Display.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Sys80b_Driver.cpp">
+    <ClCompile Include="TextDisplay.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DisplayWithFX.cpp">
+    <ClCompile Include="ExtTextDisplay.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Game.cpp">
+    <ClCompile Include="BitMappedSet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Timer.cpp">
+    <ClCompile Include="TestModule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="TimerClient.cpp">
+    <ClCompile Include="uiMenu.cpp.old">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PinHW.cpp">
+    <ClCompile Include="Sys80b_Actuator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sdio.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CmdExecutor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PinGame.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

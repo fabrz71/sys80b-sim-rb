@@ -2,57 +2,53 @@
 * (SIMulation Pinball Replacement control Board)
 * software for Teensy 3.x board developed with Arduino IDE
 * under GNU General Public Livence v3
-* ---
-* LIGHT GROUP OBJECT
-* ---
-* A "Light group" is a selection of Lights.
-* Lights in the group are simply referred by their sequential number.
-* The group has its own dimension and name.
 */
+
+//rev: jan/20
 
 #ifndef _LightGroup_h
 #define _LightGroup_h
 
-//#include "Arduino.h"
+#include "Arduino.h"
+//#include "LightSet.h"
 #include "Light.h"
+//#include "msg.h"
 
-//class LightSet;
-//#define S_LIGHT(n) LightSet::currentStage->light[lightNum[n]]
-//#define S_LIGHT(n) refLightSet.getLight(lightNum[n]);
+class LightSet;
 
+// Selection of Lights that belongs to an arbitrary group,
+// referred by their sequential number [0..47].
+// The group has its own dimension and name.
+// LightGroup offers functions for common effects on all
+// the lights of the group, as: setAll(), rotate...(), shift...().
+// It operates on the lights of the active LightSet referred
+// by public static pointer <activeLightSet>.
 class LightGroup {
   public:
 	//static const int MAX_SIZE = 16;
-	static Light *refLightSet; // unique reference LightSet for any instance
-    const char *nameStr;
-    byte *lightNum; // array
+	static LightSet* activeLightSet; // unique reference LightSet for any instance
+    String nameStr;
+    byte *lightNum; // array of indexes (light numbers)
 
 protected:
-	byte _size;
-	//LightSet* refLightSet; // underlying light setPeriod
-	Light _tmpLight; // temporary buffer
+	byte _size; // light group size
+	Light* _tmpLight; // temporary light object for copy operations
 
 public:
-	LightGroup();
-    //LightGroup(const char *setName, const byte *lightNumber, byte arrayLength);
-    //LightGroup(const char *setName, const byte *lightNumber);
-	LightGroup(const char *setName, byte lNumber ...);
-	//LightGroup(const char *setName, const byte l1, const byte l2);
-	//LightGroup(const char *setName, const byte l1, const byte l2, const byte l3);
-	//LightGroup(const char *setName, const byte l1, const byte l2, const byte l3, const byte l4);
-	//LightGroup(const char *setName, const byte l1, const byte l2, const byte l3, const byte l4, const byte l5);
+    LightGroup(const char *setName, int32_t lNumber ...);
+    LightGroup(String setName, int32_t lNumber ...);
 
-	Light* Light(byte n);
-    void setLight(byte n, lightState st);
-    void setLight(byte n, lightState st, uint16_t blinkP);
+	Light* light(byte n);
+    void set(byte n, lightState st);
+    void blink(byte n, uint16_t blinkP = Light::DEF_BLNK_PERIOD, byte ticks = 0);
     void invert(byte n);
     void pulse(byte n, uint16_t tm);
-    lightState getLState(byte n);
+    lightState getState(byte n);
     bool isActive(byte n);
     void setAll(lightState st);
-    void setAll(lightState st, uint16_t blinkP);
-    byte switchOne(lightState st);
-    byte switchOne(lightState st, uint16_t maxP);
+    inline void setAll(bool st) { setAll(st ? ON_L : OFF_L); }
+    byte switchTheFirst(lightState st);
+    byte switchTheFirst(lightState st, uint16_t maxP);
     void setActivePeriod(byte n, uint16_t maxP);
     bool areAll(lightState st);
     void shiftRight();
@@ -60,7 +56,9 @@ public:
     void shiftLeft();
     void rotateLeft();
 	byte getSize();
-    void toString();
+    String toString();
+
+    inline static void setActiveLightSet(LightSet* ls) { LightGroup::activeLightSet = ls; }
 };
 
 #endif

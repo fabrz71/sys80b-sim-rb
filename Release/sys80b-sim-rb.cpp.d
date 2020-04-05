@@ -1,0 +1,23 @@
+C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\sys80b-sim-rb.cpp.o: \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\sys80b-sim-rb.cpp \
+ C:\Users\Fabrizio\Documents\Arduino\libraries\MemoryFree-master/MemoryFree.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\msg.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug/pch/Arduino.h \
+ C:\Users\Fabrizio\Dropbox\Personal\src\GitHub\sys80b-board\src/Board_Sys80b.h \
+ C:\Users\Fabrizio\Dropbox\Personal\src\GitHub\sys80b-board\src/PIO.h \
+ C:\Users\Fabrizio\Dropbox\Personal\src\GitHub\sys80b-board\src/Led8x8.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\BigHouse.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\Game.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\Sys80b.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\BitMappedSet.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\Sys80b_Display.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\ExtTextDisplay.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\TextDisplay.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\Buffer.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\SwitchGrid8x8.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\LightSet.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\Light.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\TimerSet.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\TimerTask.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\Sys80b_Sensor.h \
+ C:\Users\Fabrizio\AppData\Local\Temp\VMBuilds\sys80b-sim-rb\teensy31\Debug\Sys80b_Actuator.h

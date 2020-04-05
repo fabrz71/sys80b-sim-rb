@@ -8,6 +8,9 @@
 * Basic I/O functions for SD card.
 */
 
+#include <SPI.h>
+//#include <SD_t3.h>
+#include <SD.h>
 #include "sdio.h"
 
 boolean sdOk;

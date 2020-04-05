@@ -14,7 +14,7 @@
 #ifndef _Light_h_
 #define _Light_h_
 
-//#include "Arduino.h"
+#include "Arduino.h"
 
 //#define DEF_BLNK_PERIOD 200 // default light blink rate
 //#define DEF_PULSE_PERIOD 200 // default light pulse rate
@@ -25,7 +25,7 @@ enum lightState {
   OFF_L,    // light off
   ON_L,     // light on
   BLINK_L,  // alternate on/off ligth state (with duty cycle)
-  };
+};
 
 // software mid-level light object, with its own state
 // regular periodic calls to update() function is required for
@@ -37,29 +37,30 @@ class Light {
 	  static const uint32_t LSTAGE_SIZE = 48; // stage total lights _size
     bool on; // true when light switched on
     lightState state; // defines light behaviour along time
-    uint16_t blinkPeriod; // ON+OFF time (ms) when in BLINK_L state
+    uint16_t blinkPeriod; // ON+STATIC_TEXT time (ms) when in BLINK_L state
     byte blinkDutyCycle; // 0-100 % ON time when in BLINK_L state
-    uint32_t activationTime; // time when lamp has activated (from OFF to another state)
+    uint32_t activationTime; // time when lamp has activated (from STATIC_TEXT to another state)
     uint16_t activePeriod; // time limit for any state different than OFF_L (ms)
         // (0 = unlimited time)
     bool impulse; // temporary inverted on/off state
     uint32_t pulseTime; // time when lamp pulse has activated
     uint16_t pulsePeriod; // pulse state duration
-	bool effective; // rendering flag: true when light rendered
+    //byte brightness;
 
+//public:
     Light();
     void copy(Light &from);
 	void copy(Light *from);
     void reset();
-    void set(lightState st);
-    void set(lightState st, uint16_t blinkP);
-    void blink(uint16_t blinkP, byte ticks);
-    void set(lightState st, uint16_t blinkP, byte blinkDutyC);
+
+    // define the state of the light
+    inline void set(bool st) { set(st ? ON_L : OFF_L); }
+    void blink(uint16_t blinkP = DEF_BLNK_PERIOD, byte blinkDutyC = 50, byte ticks = 0);
     void invert();
-    void pulse(uint16_t pulseP);
-    void update(uint32_t ms);
-    bool isActive();
+    void pulse(uint16_t pulseP = DEF_PULSE_PERIOD);
+    bool update(uint32_t ms);
+    inline bool isActive() const { return (state != OFF_L); }
+    void set(lightState st, uint16_t blinkP = DEF_BLNK_PERIOD, byte blinkDutyC = 50, uint16_t activeT = 0);
 };
 
 #endif
-

@@ -17,87 +17,101 @@
 #include "TimerTask.h"
 
 TimerTask::TimerTask() {
-	funct = NULL;
-	period = 1000;
+	//Serial.println("Timertask init...");
+	execObj = NULL;
+	id = 0;
+	_period = 1000;
 	oneShot = true;
-	enabled = false;
+	_enabled = false;
 	tag = "";
 	_next = NULL;
 }
 
-TimerTask::TimerTask(func_t sub, uint32_t ms, bool periodic = true) {
+TimerTask::TimerTask(TimerTaskExecutor* obj, uint32_t ms, bool periodic, bool en) {
 	//Serial.println("Creating TimerTask... ");
-	funct = sub;
-	period = ms;
+	execObj = obj;
+	//id = taskId;
+	_period = ms;
 	oneShot = !periodic;
-	enabled = false;
+	_enabled = en;
 	tag = "";
 	_next = NULL;
 }
 
-TimerTask::TimerTask(func_t sub, uint32_t ms, const char *name) {
+TimerTask::TimerTask(TimerTaskExecutor* obj, uint32_t ms, const char* name, bool en) {
 	//Serial.println("Creating TimerTask... ");
-	funct = sub;
-	period = ms;
+	execObj = obj;
+	//id = taskId;
+	_period = ms;
 	oneShot = false;
-	enabled = false;
+	_enabled = en;
 	tag = (name == NULL) ? "" : name;
 	_next = NULL;
 }
 
+// Updates Timertask state, checking whether its wait period has expired
 // returns: remaining time before trigger [ms] > 0; 0 if not enabled
-uint32_t TimerTask::check(uint32_t chkTime = 0) {
+uint32_t TimerTask::update(uint32_t& chkTime) {
 	uint32_t elapsed;
 
-	if (!enabled) return 0;
-	if (chkTime == 0) chkTime = millis();
-	if (chkTime < start_time) elapsed = ~start_time + chkTime + 1;
-	else elapsed = chkTime - start_time;
-	if (elapsed >= period) {
-		if (funct != NULL) funct(chkTime);
+	if (!_enabled) return UINT32_MAX;
+	//if (chkTime == 0) chkTime = millis();
+	if (chkTime < _startTime) elapsed = ~_startTime + chkTime + 1;
+	else elapsed = chkTime - _startTime;
+	if (elapsed >= _period) {
+		execObj->timerRoutine(id, chkTime);
+		//if (funct != NULL) (_game->*funct)(chkTime);
 		if (oneShot) {
-			enabled = false;
+			_enabled = false;
 			return 0;
 		}
-		start_time = chkTime;
-		return period;
+		_startTime = chkTime;
+		return _period;
 	}
-	return period - elapsed;
+	return _period - elapsed;
 }
 
 uint32_t TimerTask::getRemainingTime(uint32_t chkTime) {
 	uint32_t elapsed;
 
-	if (!enabled) return 0;
+	if (!_enabled) return 0;
 	if (chkTime == 0) chkTime = millis();
-	if (chkTime < start_time) elapsed = ~start_time + chkTime + 1;
-	else elapsed = chkTime - start_time;
-	if (elapsed >= period) return 0;
-	return period - elapsed;
+	if (chkTime < _startTime) elapsed = ~_startTime + chkTime + 1;
+	else elapsed = chkTime - _startTime;
+	if (elapsed >= _period) return 0;
+	return _period - elapsed;
 }
 
 void TimerTask::print() {
 	Serial.print("['");
 	if (tag != NULL) Serial.print(tag);
 	Serial.print("',");
-	Serial.print(period);
-	if (enabled) Serial.print(",1]"); else Serial.print(",0]");
+	Serial.print(_period);
+	if (_enabled) Serial.print(",1]"); else Serial.print(",0]");
 }
 
-inline void TimerTask::setPeriod(uint32_t ms, bool periodic) { 
-	period = ms; 
-	oneShot = !periodic; 
+void TimerTask::setPeriod(uint32_t ms) {
+	_period = ms;
 }
 
-inline void TimerTask::setFunction(func_t sub) { 
-	funct = sub; 
+void TimerTask::setPeriod(uint32_t ms, bool periodic) {
+	_period = ms;
+	oneShot = !periodic;
 }
 
-inline void TimerTask::enable() { 
-	start_time = millis(); 
-	enabled = true;
+void TimerTask::setPeriodic(bool periodic) {
+	oneShot = !periodic;
 }
 
-inline void TimerTask::disable() { 
-	enabled = false; 
+void TimerTask::enable() {
+	_startTime = millis();
+	_enabled = true;
+}
+
+void TimerTask::disable() {
+	_enabled = false;
+}
+
+bool TimerTask::isEnabled() {
+	return _enabled;
 }

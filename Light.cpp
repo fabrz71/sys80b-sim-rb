@@ -21,7 +21,8 @@ Light::Light() {
 	blinkPeriod = 500;
 	blinkDutyCycle = 50;
 	activePeriod = 0;
-	effective = true;
+	//updated = true;
+	//_changed = false;
 }
 
 // convenient funcion for copying a Light state into another
@@ -44,61 +45,42 @@ void Light::copy(Light *from) {
 	blinkDutyCycle = from->blinkDutyCycle;
 	activationTime = from->activationTime;
 	activePeriod = from->activePeriod;
+	impulse = from->impulse;
+	pulseTime = from->pulseTime;
+	pulsePeriod = from->pulsePeriod;
 }
 
 // switch off light and reset its properties
 void Light::reset() {
 	on = false;
 	state = OFF_L;
-	blinkPeriod = 500; // ON+OFF (ms)
+	blinkPeriod = 500; // ON+STATIC_TEXT (ms)
 	blinkDutyCycle = 50; // 0-100 % ON time
 	activePeriod = 0; // (ms)
 }
 
-// define the state of the light
-inline void Light::set(lightState st) {
-	set(st, (st == BLINK_L) ? DEF_BLNK_PERIOD : 0, 50);
-}
-
-// define the state of the light
-// st: light state
-// blinkP: blink period (on + off) [milliseconds]
-inline void Light::set(lightState st, uint16_t blinkP) {
-	set(st, blinkP, 50);
-}
-
-void Light::set(lightState st, uint16_t blinkP, byte blinkDutyC) {
-	switch (st) {
-	case OFF_L:
-		on = false;
-		break;
-	case ON_L:
-		on = true;
-		break;
-	case BLINK_L:
-		if (blinkP == 0) state = ON_L;
-		on = true;
-		break;
-	default:
-		return;
+void Light::set(lightState st, uint16_t blinkP, byte blinkDutyC, uint16_t activeT) {
+	on = (st != OFF_L);
+	if (st == ON_L && st != state) {
+		activationTime = millis();
+		activePeriod = activeT; // unlimited state time (default)
+	}
+	if (st == BLINK_L) {
+		blinkPeriod = (blinkP == 0) ? DEF_BLNK_PERIOD : blinkP;
+		blinkDutyCycle = (blinkDutyC == 0) ? 50 : blinkDutyC;
 	}
 	state = st;
-	if (on) activationTime = millis();
-	blinkPeriod = blinkP;
-	if (blinkDutyC == 0) blinkDutyCycle = 50;
-	else blinkDutyCycle = blinkDutyC;
-	activePeriod = 0; // unlimited state time (default)
 }
 
-inline void Light::blink(uint16_t blinkP, byte ticks) {
-	set(BLINK_L, blinkP, 50);
+void Light::blink(uint16_t blinkP, byte blinkDutyC, byte ticks) {
+	set(BLINK_L, blinkP, blinkDutyC);
 	activePeriod = blinkP * ticks;
 }
 
-// inverts light ON/OFF state
+// inverts light ON/OFF static state
 void Light::invert() {
-	if (state == ON_L) state = OFF_L;
-	else if (state == OFF_L) state = ON_L;
+	if (state == ON_L) set(OFF_L);
+	else if (state == OFF_L) set(ON_L);
 }
 
 void Light::pulse(uint16_t pulseP) {
@@ -108,11 +90,13 @@ void Light::pulse(uint16_t pulseP) {
 	on = !on;
 }
 
-void Light::update(uint32_t ms) {
-	uint32_t t; // blink ON time
+// return true when light changes its on/off state
+bool Light::update(uint32_t ms) {
+	bool prevState = on;
 
-				// blink mode
+	// blink mode (ON/STATIC_TEXT iteration)
 	if (state == BLINK_L) {
+		uint32_t t; // blink ON time
 		t = (ms - activationTime) % (uint32_t)blinkPeriod;
 		on = ((t * 100 / blinkPeriod) < blinkDutyCycle);
 	}
@@ -130,10 +114,9 @@ void Light::update(uint32_t ms) {
 		if (activePeriod > 0 && (ms - activationTime) >= (uint32_t)activePeriod) {
 			activePeriod = 0; // resets previous active-time setting
 			state = OFF_L;
+			on = false;
 		}
 	}
-}
 
-inline bool Light::isActive() {
-    return (state != OFF_L); 
+	return (on != prevState);
 }

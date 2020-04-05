@@ -6,22 +6,22 @@
 			All non-arduino files created by visual micro and all visual studio project or solution files can be freely deleted and are not required to compile a sketch (do not delete your own code!).
 			Note: debugger breakpoints are stored in '.sln' or '.asln' files, knowledge of last uploaded breakpoints is stored in the upload.vmps.xml file. Both files are required to continue a previous debug session without needing to compile and upload again
 	
-	Hardware: Teensy 3.2 / 3.1, Platform=teensy3, Package=teensy
+	Hardware: Teensy 4.0, Platform=teensy4, Package=teensy
 */
 
 #if defined(_VMICRO_INTELLISENSE)
 
 #ifndef _VSARDUINO_H_
 #define _VSARDUINO_H_
-#define __HARDWARE_mk20dx256__
-#define __HARDWARE_MK20DX256__
-#define _VMDEBUG 1
-#define __MK20DX256__
-#define TEENSYDUINO 147
-#define ARDUINO 10809
-#define F_CPU 96000000
+#define __HARDWARE_imxrt1062__
+#define __HARDWARE_IMXRT1062__
+#define __IMXRT1062__
+#define TEENSYDUINO 151
+#define ARDUINO 108012
+#define ARDUINO_TEENSY40
+#define F_CPU 600000000
 #define USB_SERIAL
-#define LAYOUT_US_ENGLISH
+#define LAYOUT_ITALIAN
 #define __cplusplus 201103L
 #undef __cplusplus
 #define __cplusplus 201103L
@@ -40,8 +40,9 @@ typedef void *__builtin_va_list;
 #define NEW_H
 #undef _WIN32
 #define __STDC__ 
-#define __GNUC__ 2
-#define __GNUC_MINOR__ 5
+//#define __GNUC__ 2
+//#define __GNUC_MINOR__ 5
+#define __ARM_ARCH_7EM__
 
 extern int at_quick_exit(void (*f)(void));
 int at_quick_exit(void (*f)(void)) {

@@ -2,71 +2,67 @@
 * (SIMulation Pinball Replacement control Board)
 * software for Teensy 3.2 board developed with Arduino IDE
 * under GNU General Public Livence v3
-* ---
-* PINBALL GAME SPECIFIC CODE
-* ---
-* Implements game specific rules and behavior.
-* Valid only for the game specifed below.
+* by Fabrizio Volpi (fabvolpi@gmail.com)
 */
 
+//#ifdef _BigHouse_h_
 #ifndef _BigHouse_h_
 #define _BigHouse_h_
 
-/********************
-*                   *
-*   GOTTLIEB GAME   *
-*        #713       *
-*    "BIG HOUSE"    *
-*  SOFTWARE MODULE  *
-*                   *
-*********************/
+#include "Arduino.h"
+#include "PinGame.h"
+#include "msg.h"
+//#include "TimerTask.h"
+//#include "LightGroup.h"
 
-//#include "Arduino.h"
-//#include "BaseLogic.h"
-#include "Game.h"
-#include "LightGroup.h"
+#define _GAME_IMPLEM_ BigHouse
 
-//class TimerTask;
+class LightGroup;
+//extern Msg msg;
 
-#define _GAME_CLASS_ BigHouse
-
-#ifndef byte
-typedef uint8_t byte;
-#endif
-
-class BigHouse : public Game
-{
+// Implements game specific rules and behavior.
+// Valid only for the game specifed below.
+//*** #713 "BIG HOUSE" ***
+class BigHouse : public PinGame {
 public:
 	// pinball game-specific identification data
+	const char* CLASSNAME = "BigHouse";
 	const int GAME_NUMBER = 713;
 	const char *GAME_NAME = "Big House";
-	
+	//const byte SND16_LMP = 4;
+
 	bool multiballMode;
 	bool ballTrap[3]; // left, right, upper right, lower right
 	byte capturedBalls; // 0..3
 	bool tableEnabled;
 	bool extraBallGiven;
-	byte cellBlockSeq, wallSeq, jailSeq, breakSeq, dropTargetSeq;
+	byte cellBlockSeq, wallSeq, jailSeq, breakSeq, dropTargetHit;
 	byte multiSeq;
 	uint16_t bonusAdvanceSwitches;
-	TimerTask *dropt_tmr, *lshow_tmr;
 	byte multiplier[4] = { 1, 2, 4, 8 };
-	byte lightShowSeq;
+	byte displayShowStep;
+	uint16_t displayShowDelay;
 	uint16_t lightShowDelay;
+	uint16_t lightShowArg;
 	bool lightShowOrder;
-
-	LightGroup extraball_ls, lastchance_ls, special_ls, wall_ls, break_ls;
-	LightGroup jail_ls, multi_ls, cellblock_ls, lightshow_ls, droptarget_ls;
-	LightGroup show1_ls, show2_ls, show3_ls, show4_ls, show5_ls, show6_ls;
-	LightGroup *lShow_set;
+	byte lightShowType;
+	uint16_t lightShowStep;
+	TimerTask* dropt_tmr, * lshow_tmr, * brel_tmr, * dshow_tmr;
+	int dropTargets_tt, lightShow_tt, ballRelease_tt, display_tt;
 
 	// special lamps: not exactly real lamps but solenoids
-	static const byte SPECIAL_LAMPS_COUNT = 8;
-	PROGMEM const byte special_lamp[SPECIAL_LAMPS_COUNT] = { 0, 1, 2, 4, 12, 13, 14, 15 };
-	
+	//static const byte SPECIAL_LAMPS_COUNT = 8;
+	//const byte special_lamp[SPECIAL_LAMPS_COUNT] = { 0, 1, 2, 4, 12, 13, 14 };
+	enum SpecialLamp { SND16_LMP = 4, RAMP_LMP = 12, BALLGATE_LMP = 13, AUGER_LMP = 14 };
+
+	LightGroup *extraball_ls, *lastchance_ls, *special_ls, *wall_ls, *break_ls;
+	LightGroup *jail_ls, *multi_ls, *cellblock_ls, *lightshow_ls, *droptarget_ls;
+	LightGroup *show1_ls, *show2_ls, *show3_ls, *show4_ls, *show5_ls, *show6_ls;
+	LightGroup* lShow_set[8];
+	//LightGroup **lShow_set;
 
 	// lamps description
-	PROGMEM const String lightInfo[LAMPS_COUNT] = {
+	const String lightInfo[LAMPS_COUNT] = {
 		F("_Relay 'Q'"),       // #0: not a lamp: GAME OVER 'Q' relay
 		F("_Relay 'T'"),       // #1: not a lamp: TILT 'T' relay
 		F("_ball release"),    // #2: not a lamp: BALL RELEASE solenoid
@@ -82,7 +78,7 @@ public:
 		F("_ramp"),            // #12: not a lamp: RAMP solenoid
 		F("_ball gate relay"), // #13: not a lamp: BALL GATE relay
 		F("_auger motor relay 'A'"), // #14: not a lamp: AUGER MOTOR ('A' relay)
-		F("Ramp 'lock'"), // #15
+		F("Ramp 'lock'"),		// #15
 		F("center dome (#67)"), // #16
 		F("bottom left & right light show"), // #17
 		F("100,000x multiplier"),    // #18 glass top lights
@@ -117,13 +113,14 @@ public:
 		F("Spot/Search light") // #47
 	};
 
-	// specific special lamps
-#define liftRamp(v) setLamp(12, v);
-#define openGate(v) setLamp(13, v);
+// specific special lamps
+#define liftRamp(v) setLamp(12, v)
+#define openGate(v) setLamp(13, v)
 #define switchAuger(v) setLamp(14, v)
 
-// solenBits description
-	PROGMEM const String solInfo[SOLENOID_COUNT] = {
+// solenoids description
+	 const String solInfo[SOLENOID_COUNT+1]  = {
+		F("(none)"),           // #0 (void)
 		F("hole"),             // #1
 		F("left shooter"),     // #2
 		F("left top dome light"),   // #3
@@ -148,112 +145,112 @@ public:
 	};
 	// RAMP_SOL=28, BGATE_SOL, AUGER_SOL };
 
-	// sound effects - TODO: to complete
+	// soundBuffer effects - TODO: to complete
 	enum Sfx {
-		ALLRIGHT = 1,
+		SND_ALLRIGHT = 1,
 		SND2,
 		SND3,
 		SND4,
 		SND5,
 		SND6,
-		FADING, // fades sound/music volume to 0
-		MAXVOL, // turns volume to max level
-		LOWERVOL, // turns volume to a lower level
+		SND_FADING, // fades soundBuffer/music volume to 0
+		SND_MAXVOL, // turns volume to max level
+		SND_LOWERVOL, // turns volume to a lower level
 		SND10,
-		MUSIC_SPECIAL, // special music (continuos)
+		SND_MUSIC_SPECIAL, // special music (continuos)
 		SND12,
-		MUSIC_GRAND_FINAL,
+		SND_MUSIC_GRAND_FINAL,
 		SND14,
-		MUSIC, // standard music (continuos)
+		SND_MUSIC, // standard music (continuos)
 		SND16,
 		SND17,
 		SND18,
-		COIN_DROP,
-		MUSIC2, // (continuos)
-		MUSIC3, // (continuos)
+		SND_COIN_DROP,
+		SND_MUSIC2, // (continuos)
+		SND_MUSIC3, // (continuos)
 		SND22,
 		SND23,
 		SND24,
 		SND25,
 		SND26,
-		SIREN_FAST, // fast siren
-		SIREN_SLOW, // slow siren (continuos)
+		SND_SIREN_FAST, // fast siren
+		SND_SIREN_SLOW, // slow siren (continuos)
 		SND29,
 		SND30,
-		SHUT_UP
+		SND_SHUT_UP
 	};
 
 	// void string for unused switches in switch matrix
-#define NOSW (const char*)NULL
+#define NOSW (const char*)nullptr
 
-// switch matrix: switches description
-	const String swInfo[64] = {
-		/* 00..05 */ NOSW,  NOSW,  NOSW,  NOSW,  NOSW,  NOSW,
-		/* 06 */ F("Left advance button"),
-		/* 07 */ F("Play/Test button"),
-
-		/* 10..15 */ NOSW,  NOSW,  NOSW,  NOSW,  NOSW,  NOSW,
-		/* 16 */ F("Right advance button"),
-		/* 17 */ F("Left Coin Chute"),
-
-		/* 20..25 */ NOSW,  NOSW,  NOSW,  NOSW,  NOSW,  NOSW,
-		/* 26 */ F("ball on chain"),
-		/* 27 */ F("Right Coin Chute"),
-
-		/* 30 */ F("left side rollover"),
-		/* 31 */ F("#1 target 'BREAK'"),
-		/* 32 */ F("kicking rubbers"),
-		/* 33 */ F("top pop bumper"),
-		/* 34 */ F("#1 cell block spot target"),
-		/* 35 */ F("left flipper"),
-		/* 36 */ F("right flipper"),
-		/* 37 */ F("Center Coin Chute"),
-
-		/* 40 */ F("#1 drop target"),
-		/* 41 */ F("#2 target 'BREAK'"),
-		/* 42 */ F("#1 target 'JAIL'"),
-		/* 43 */ F("right pop bumper"),
-		/* 44 */ F("#2 cell block spot target"),
-		/* 45 */ F("left outside rollover"),
-		/* 46 */ F("left shooter"),
-		/* 47 */ F("Replay button"),
-
-		/* 50 */ F("#2 drop target"),
-		/* 51 */ F("#3 target 'BREAK'"),
-		/* 52 */ F("#2 target 'JAIL'"),
-		/* 53 */ F("bottom pop bumper"),
-		/* 54 */ F("#1 top rollover"),
-		/* 55 */ F("left return rollover"),
-		/* 56 */ F("right shooter"),
-		/* 57 */ F("tilt"),
-
-		/* 60 */ F("#3 drop target"),
-		/* 61 */ F("#4 target 'BREAK'"),
-		/* 62 */ F("#3 target 'JAIL'"),
-		/* 63 */ F("#3 cell block spot target"),
-		/* 64 */ F("#2 top rollover"),
-		/* 65 */ F("right return rollover"),
-		/* 66 */ F("outhole"),
-		/* 67 */  NOSW,
-
-		/* 70 */ F("#4 drop target"),
-		/* 71 */ F("#5 target 'BREAK'"),
-		/* 72 */ F("#4 target 'JAIL'"),
-		/* 73 */ F("#4 cell block spot target"),
-		/* 74 */ F("#3 top rollover"),
-		/* 75 */ F("right outside rollover"),
-		/* 76 */ F("hole"),
-		/* 77 */ NOSW
+// switch matrix: inputs description
+	class Sw {
+	protected:
+		Sys80b* _sys;
+	public:
+		SENSOR(ballTarget, 26, "ball on chain");
+		SENSOR(leftSideRollover, 30, "left side rollover");
+		SENSOR(break1, 31, "'BREAK' target #1");
+		SENSOR(kickRubbers, 32, "kicking rubbers");
+		SENSOR(topPopBumper, 33, "top pop bumper");
+		SENSOR(spotTarget1, 34, "cell block spot Target #1");
+		SENSOR(leftFlipper, 35, "left flipper");
+		SENSOR(rightFlipper, 36, "right flipper");
+		SENSOR(dropTarget1, 40, "drop target #1");
+		SENSOR(break2, 41, "'BREAK' target #2");
+		SENSOR(jail1, 42, "'JAIL' target #1");
+		SENSOR(midPopBumper, 43, "center pop bumper");
+		SENSOR(spotTarget2, 44, "cell block spot Target #2");
+		SENSOR(leftOutside, 45, "left outside rollover");
+		SENSOR(leftShooter, 46, "left shooter");
+		SENSOR(dropTarget2, 50, "drop target #2");
+		SENSOR(break3, 51, "'BREAK' target #3");
+		SENSOR(jail2, 52, "'JAIL' target #2");
+		SENSOR(bottomPopBumper, 53, "bottom pop bumper");
+		SENSOR(topRollover1, 54, "top rollover #1");
+		SENSOR(leftReturn, 55, "left return rollover");
+		SENSOR(rightShooter, 56, "right shooter");
+		SENSOR(dropTarget3, 60, "drop target #3");
+		SENSOR(break4, 61, "'BREAK' target #4");
+		SENSOR(jail3, 62, "'JAIL' target #3");
+		SENSOR(spotTarget3, 63, "cell block spot Target #3");
+		SENSOR(topRollover2, 64, "top rollover #2");
+		SENSOR(rightReturn, 65, "right return rollover");
+		SENSOR(outHole, 66, "out hole");
+		SENSOR(dropTarget4, 70, "drop target #4");
+		SENSOR(break5, 71, "'BREAK' target #5");
+		SENSOR(jail4, 72, "'JAIL' target #4");
+		SENSOR(spotTarget4, 73, "cell block spot Target #4");
+		SENSOR(topRollover3, 74, "top rollover #3");
+		SENSOR(rightOutside, 75, "right outside rollover");
+		SENSOR(hole, 76, "hole");
+		// constructor
+		Sw(Sys80b* sys) : _sys(sys) {};
 	};
-
-	// cabinet buttons' switches
-#define LEFTADV_SW 6
-#define RIGHTADV_SW 14
-#define REPLAY_SW 39
-#define TEST_SW 7
+	Sw sw = Sw(this);
+	
+	// specific actuators
+	class Act {
+	protected:
+		Sys80b* _sys;
+	public:
+		ACTUATOR(leftShooter, SOLENOIDS, 2, "left shooter");
+		ACTUATOR(leftDomeLight, SOLENOIDS, 3, "left top dome light");
+		ACTUATOR(rightDomeLight, SOLENOIDS, 4, "right top dome light");
+		ACTUATOR(rightShooter, SOLENOIDS, 5, "right shooter");
+		ACTUATOR(bankReset, SOLENOIDS, 6, "bank reset");
+		ACTUATOR(midDomeLight, SOLENOIDS, 7, "right side dome light");
+		ACTUATOR(ballRelease, LAMPS, 2, "ball release");
+		ACTUATOR(ramp, LAMPS, 12, "ramp");
+		ACTUATOR(ballGate, LAMPS, 13, "ball gate");
+		ACTUATOR(auger, LAMPS, 14, "auger motor");
+		// constructor
+		Act(Sys80b* sys) : _sys(sys) {};
+	};
+	Act act = Act(this);
 
 // switches "relative lamps"
-	PROGMEM const byte swRelLamp[64] = {
+	 const byte swRelLamp[64]  = {
 		0,  0,  0,  0,  0,  0,  0,  0, // 0x
 		0,  0,  0,  0,  0,  0,  0,  0, // 1x
 		0,  0,  0,  0,  0,  0, 16,  0, // 2x
@@ -274,16 +271,14 @@ public:
 #define DISPATCH4(f,a,b,c,d) case a: case b: case c: case d: f; break
 #define DISPATCH5(f,a,b,c,d,e) case a: case b: case c: case d: case e: f; break
 
-#define _3BALLS (GAME_BALLS() == 3)
-	//#define allDropTargetsDown() (getSwitch(40) == 1 && getSwitch(50) == 1 && getSwitch(60) == 1 && getSwitch(70) == 1)
-#define PLAYER player[playerOn]
+	BigHouse(Board_Sys80b& board);
+	~BigHouse();
 
-	BigHouse();
-	void initPinball();
-	void startAttractMode();
-	void initGame();
-	bool isSpecialLamp(byte lamp);
-	void onEvent(byte sw, bool st);
+	void begin();
+	void startNewGame();
+	//bool isSpecialLamp(byte lamp);
+	void onSwitchEvent(byte sw, bool st);
+	void onButtonPressed(UserKey butt);
 	void resetCapturedBalls();
 	void resetJailBreak();
 	void resetDropTargets();
@@ -297,8 +292,8 @@ public:
 	void awardExtraBall();
 	void onBallInHole();
 	void onDropTarget(byte n);
-	void onJailTarget(byte n);
 	void onBreakTarget(byte n);
+	void onJailTarget(byte n);
 	void onCellTarget(byte n);
 	void onTopRollover(byte n);
 	void onLeftKicker();
@@ -311,14 +306,22 @@ public:
 	void onRubber();
 	void onBallOnChain();
 	void onOutHole();
-	void dropTimerRoutine(uint32_t);
+	void dropTimerRoutine(uint32_t &ms);
 	void startLightShow();
+	void switchToNextLightShow();
+	void startDisplayShow();
 	void stopLightShow();
-	void lightShowCycle(uint32_t ms);
-	void onPRBButtonPressed(BoardIO::buttonID bt);
+	void stopDisplayShow();
+	void lightShowCycle(uint32_t &ms);
+	void displayShowCycle(uint32_t& ms);
+	//void onPRBButtonPressed(byte bt);
 	String getGameName();
 	int getGameNumber();
-
+	String getTopScoreStr(byte n);
+	bool releaseBall();
+	void snd16Update(uint32_t& t);
+	void timerRoutine(int taskIdentifer, uint32_t& ms);
+	void millisRoutine(uint32_t& ms);
 };
 
 #endif
