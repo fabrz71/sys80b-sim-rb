@@ -53,10 +53,9 @@ public:
 	bool getSwitchState(byte col, byte row);
 	bool setSwitch(byte switchNum, bool state, bool seamless = false);
 	inline uint32_t getSwitchLastChangeTime(byte col, byte row) { return swChangeTime[row & 7][col & 7]; }
-	inline byte SwitchGrid8x8::getSwitchNumber(byte col, byte row) { return (row & 7) * 10 + (col & 7); }
+	inline byte getSwitchNumber(byte col, byte row) { return (row & 7) * 10 + (col & 7); }
 	inline uint32_t getSwitchChangeCount(byte col, byte row) { return swChangeCount[row & 7][col & 7]; }
 	void clearLastSwitchChanged() { lastSwitchChanged = 0xff; }
-	byte getSwitchNumber(byte col, byte row);
 
 #ifdef SWGRID_TRACK_CHANGES
 	inline byte getCurrentChanges() { return returns_changed[strobe]; }

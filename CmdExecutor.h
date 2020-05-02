@@ -14,10 +14,13 @@ protected:
 	const __FlashStringHelper* solenoidCmd = F("solenoid");
 	const __FlashStringHelper* pulsesolenoidCmd = F("pulsesolenoid");
 	const __FlashStringHelper* lampCmd = F("lamp");
+	const __FlashStringHelper* lightCmd = F("light");
+	const __FlashStringHelper* blinklightCmd = F("blinklight");
 	const __FlashStringHelper* pulselightCmd = F("pulselight");
 	const __FlashStringHelper* ledgridCmd = F("ledgrid");
 	const __FlashStringHelper* ledgridmodeCmd = F("ledgridmode");
 	const __FlashStringHelper* lcdCmd = F("lcd");
+	const __FlashStringHelper* displayCmd = F("display");
 	const __FlashStringHelper* factorysettingsCmd = F("factorysettings");
 	const __FlashStringHelper* freememCmd = F("freemem");
 	const __FlashStringHelper* revCmd = F("rev");

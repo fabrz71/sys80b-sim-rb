@@ -23,6 +23,7 @@ void ExtTextDisplay::clearLine(byte line) {
 	display->clearRow(line);
 	stopDynamicFX(line);
 	stopBlinking(line);
+	setBlinkParams(line, DEF_BLINK_DURATION, DEF_BLINK_PERIOD, 50);
 	extLine[line].text = "";
 	_clearBlinkMask(line);
 }
@@ -50,7 +51,7 @@ void ExtTextDisplay::reset() {
 	display->setText(line, pos, text, clearBefore);
 	if (blinking) {
 		_setBlinkMask(line, text, pos);
-		setBlinkParams(line, DEF_BLINK_DURATION, DEF_BLINK_PERIOD, 50);
+		//setBlinkParams(line, DEF_BLINK_DURATION, DEF_BLINK_PERIOD, 50);
 		startBlinking(line);
 	}
 	else stopBlinking(line);
@@ -67,7 +68,7 @@ void ExtTextDisplay::reset() {
 	display->setText(line, pos, text, clearBefore);
 	if (blinking) {
 		_setBlinkMask(line, text, pos);
-		setBlinkParams(line, DEF_BLINK_DURATION, DEF_BLINK_PERIOD, 50);
+		//setBlinkParams(line, DEF_BLINK_DURATION, DEF_BLINK_PERIOD, 50);
 		startBlinking(line);
 	}
 	else stopBlinking(line);

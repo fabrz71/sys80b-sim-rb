@@ -32,11 +32,8 @@
 // **************************
 
 #define BATCH_DELAY 1000    // statistic loop duration (ms)
-
 //#define LG_MODE LG_LIGHTS
-#define LG_MODE LG_SWITCHES
-
-//#define TEST_PROC
+#define LG_MODE LG_LAMPS
 
 uint32_t millisRoutineT; // system time of last routine call [ms]
 Board_Sys80b board;
@@ -44,19 +41,11 @@ Msg& msg = board.msg;
 Sys80b* sys;
 uint16_t loopCounter;
 CmdExecutor* executor;
-
-#ifdef TEST_PROC
-void _delay(Sys80b* s, uint16_t t);
-void sys_test();
-void sysio_test();
-#else
 PinGame* game;
-#endif
-
 void millisRoutine(uint32_t& ms);
 void checkBoardButtons(uint32_t& ms);
-void updateLedGrid(lg_mode mode);
-bool processSerialInput();
+void updateLedGrid(LG_mode mode);
+bool readSerialInput();
 
 void setup() { 
     loopCounter = 0;
@@ -65,7 +54,6 @@ void setup() {
     msg.setPostDelay(0);
     board.ledGridMode = LG_MODE;
     msg.prFreeMem();
-#ifndef TEST_PROC
     msg.outln(F("Game instantiation..."));
     //game = new _GAME_IMPLEM_();
     game = new _GAME_IMPLEM_(board);
@@ -78,15 +66,6 @@ void setup() {
     msg.outln(F("Starting..."));
     //msg.setPostDelay(50);
     game->begin();
-#else
-    //Serial.println(F("Sys80b instantiation..."));
-    delay(100);
-    sys = new Sys80b(board);
-    sys->reset();
-    Serial.println(F("Starting..."));
-    delay(100);
-    sys->reset();
-#endif
 
     millisRoutineT = 0;
     msg.prFreeMem();
@@ -100,16 +79,12 @@ void loop() {
     msg.outln("...");
     //msg.setPostDelay(50);
     //prFreeMem();
-    processSerialInput();
+    readSerialInput();
 
-#ifdef TEST_PROC
-    sysio_test();
-    sys_test();
-#else
-  uint32_t t, loopStartT; // [ms]
-  uint32_t cumWorkTime, batchPeriod, t1, dt; // [us]
-  byte busy_perc; // [%]
-  uint32_t loops;
+    uint32_t t, loopStartT; // [ms]
+    uint32_t cumWorkTime, batchPeriod, t1, dt; // [us]
+    byte busy_perc; // [%]
+    uint32_t loops;
 
     loops = 0;
     cumWorkTime = 0;
@@ -150,15 +125,13 @@ void loop() {
     msg.out(busy_perc);
     msg.out("% - ");
     msg.out(loops);
-    msg.outln(" loops/s");
+    msg.out(" loops/s ");
     msg.out("(");
     msg.out(cumWorkTime);
     msg.outln("us work time)\n");
     loopCounter++;
-#endif
 }
 
-#ifndef TEST_PROC
 void millisRoutine(uint32_t& ms) {
     //msg.out(" I");
     updateLedGrid(board.ledGridMode); // LED grid update
@@ -168,12 +141,12 @@ void millisRoutine(uint32_t& ms) {
     game->millisRoutine(ms);
 }
 
+// PRB buttons check
 void checkBoardButtons(uint32_t& ms) {
-    // PRB buttons check
-    if ((ms & 0x1f) == 0) { // Debounced on-board buttons update
-        //if (board.readButtonsChange()) {
-            ButtonID b = board.readButtons();
-            UserKey k;
+    if ((ms & 0x1f) == 0) { // every 32 ms
+        if (board.readButtonsChange()) { // ONLY ON CHANGE EVENT...
+            Button b = board.readButtons(); // Debounced on-board buttons update
+            UserKey k = NO_KEY;
             switch (b) {
             case NEXT_BUTT:
                 msg.outln("NEXT button pressed");
@@ -187,17 +160,20 @@ void checkBoardButtons(uint32_t& ms) {
                 msg.outln("ENTER button pressed");
                 k = REPLAY_KEY;
                 break;
-            default:
+            case NONE_BUTT:
+                msg.outln("button released");
                 k = NO_KEY;
+                break;
             }
-            game->updUserKeyState(k, ms);
-        //}
+            game->setKeyPressed(k, ms);
+        }
     }
 }
 
-void updateLedGrid(lg_mode mode) {
+void updateLedGrid(LG_mode mode) {
     byte b = 0;
     static byte r = 0;
+    //static bool show = true;
 
     //r = game->switchGrid.getCurrentStrobe();
     switch (mode) {
@@ -207,6 +183,8 @@ void updateLedGrid(lg_mode mode) {
             if (sys->readSlamSwitch()) b |= 0x01;
             else b &= 0xfe;
         }
+        //if (show) Serial.printf("s%d -> %d\n", r, b);
+        //if (r == 7) show = false;
         break;
     case LG_LAMPS:
         if (r < 6) b = sys->lamps->getStates8(r);
@@ -227,117 +205,13 @@ void updateLedGrid(lg_mode mode) {
     board.ledGrid->setRowByte(r++, b);
     r &= 0x7;
 }
-#endif
 
-bool processSerialInput() {
+bool readSerialInput() {
     bool ret = false;
 	if (Serial.available() > 0) {
 		String st = Serial.readString();
 		ret = executor->execCmd(st);
+        //delete st;
 	}
 	return ret;
 }
-
-#ifdef TEST_PROC
-
-// test routine for Teensy outputs
-void sysio_test() {
-    int i, j;
-    byte b;
-
-    Serial.println("** System/IO tests **");
-    Serial.print("- solenoids");
-    b = 0;
-    for (i = 0; i < 9; i++) {
-        b |= 1u << i;
-        board.writeSolenoids(b);
-        Serial.print(".");
-        delay(100);
-    }
-    for (i = 0; i < 9; i++) {
-        b &= ~(1u << i);
-        board.writeSolenoids(b);
-        Serial.print(".");
-        delay(100);
-    }
-    Serial.println("");
-    Serial.print("- lamps");
-    for (i = 0; i < 12; i++) {
-        b = 0;
-        for (j = 0; j < 4; j++) {
-            b |= 1u << j;
-            board.write4Lamps(i, b);
-            Serial.print(".");
-            delay(100);
-        }
-    }
-    for (i = 0; i < 12; i++) {
-        board.write4Lamps(i, 0);
-        Serial.print(".");
-        delay(100);
-    }
-    Serial.println("");
-    Serial.print("- sound");
-    for (i = 0; i < 32; i++) {
-        board.writeSound(i);
-        Serial.print(".");
-        delay(100);
-    }
-    board.writeSound(0);
-    Serial.println("");
-    Serial.print("- display");
-    for (i = 0; i < 8; i++) {
-        board.writeDisplayData(1u << i);
-        Serial.print(".");
-        delay(100);
-    }
-    for (i = 0; i < 3; i++) {
-        board.writeDisplayLD(i);
-        Serial.print(".");
-        delay(100);
-    }
-    board.writeDisplayLD(0);
-    Serial.println("");
-}
-
-void sys_test() {
-    int i;
-
-    Serial.println("** System tests **");
-    Serial.println("- solenoids");
-    for (i = 0; i < 9; i++) {
-        sys->setSolenoid(i, true);
-        _delay(sys, 100);
-    }
-    for (i = 0; i < 9; i++) {
-        sys->setSolenoid(i, false);
-        _delay(sys, 100);
-    }
-    Serial.println("- lamps");
-    for (i = 0; i < Sys80b::LAMPS_COUNT; i++) {
-        sys->setLamp(i, true);
-        _delay(sys, 100);
-    }
-    for (i = 0; i < Sys80b::LAMPS_COUNT; i++) {
-        sys->setLamp(i, false);
-        _delay(sys, 100);
-    }
-    Serial.println("- sound");
-    for (i = 0; i < 32; i++) {
-        sys->setSound(i);
-        _delay(sys, 100);
-    }
-    sys->setSound(0);
-}
-
-void _delay(Sys80b* s, uint16_t t) {
-    uint16_t j;
-    uint32_t m;
-    for (j = 0; j < t; j++) {
-        m = millis();
-        s->_millisRoutine(m);
-        delayMicroseconds(500);
-    }
-}
-
-#endif

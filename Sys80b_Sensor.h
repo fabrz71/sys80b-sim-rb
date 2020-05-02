@@ -19,7 +19,7 @@ public:
 	};
 	inline bool isClosed() { return _sys->readSwitch(num); }
 	inline bool isOpen() { return !_sys->readSwitch(num); }
-	inline byte getNumber() { return num; }
+	inline byte Number() { return num; }
 	inline String getDescription() { return descr; }
 };
 

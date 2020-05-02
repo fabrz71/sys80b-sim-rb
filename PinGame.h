@@ -23,7 +23,17 @@
 #include "Sys80b_Actuator.h"
 #include "ExtTextDisplay.h"
 
-enum pinballMode { SHOW_MODE, GAME_MODE, TEST_MODE, BOOKKEEP_MODE };
+#define DISPATCH(f,a) case a: f; return
+
+enum PinballMode { SHOW_MODE, GAME_MODE, TEST_MODE, BOOKKEEP_MODE, SETTINGS_MODE };
+
+//struct Mode {
+//	static const byte ATTRACT = 0;
+//	static const byte PLAY = 1;
+//	static const byte TEST = 2;
+//	static const byte BOOKKEEP = 3;
+//	static const byte SETTINGS = 4;
+//};
 
 // top score entry
 struct TopPlay {
@@ -35,9 +45,10 @@ struct TopPlay {
 struct Player {
 	uint32_t score = 0; // total play score
 	uint32_t bonus = 0; // ball bonus scor
-	byte ballsLeft = 0; // balls o play
+	byte ballsLeft = 0; // balls to play; 0 -> game over
 	byte awardLevelReached = 0;
 	bool topScorer = false;
+	//bool gameOver = false;
 };
 
 class PinGame : public Sys80b, public TimerTaskExecutor {
@@ -55,13 +66,13 @@ public:
 	byte ch_coins[3]; // coins for credits (left, center, right) (settings)
 	byte ch_credits[3]; // credits by coins (left, center, right) (settings)
 	byte coins[3]; // uncredited coins inserted (left, center, right)
-	//byte pinballMode; // see enum pinball_mode
+	//byte PinballMode; // see enum pinball_mode
 	//byte defaultBallsPerPlay;
 	byte modeStep; // see enum gameStage
-	byte playerOn; // 0..MAX_PLAYER-1
-	
+	byte playerOn; // current player index: 0..MAX_PLAYER-1
+	bool tiltState;
 	//bool allBallsInHole;
-	byte ballsOnField;
+	//byte ballsOnField;
 	uint32_t awardLevelScore[3]; // next award score
 	//byte lastSw;
 	uint16_t swCount; // switchGrid changes counter
@@ -82,14 +93,15 @@ public:
 		SENSOR(rightCoin, RIGHTCOIN_SW, "Right coin");
 		SENSOR(centerCoin, CENTERCOIN_SW, "Right coin");
 		SENSOR(replay, REPLAY_SW, "Replay button");
-		SENSOR(tilt, REPLAY_SW, "Tilt (cabinet)");
+		SENSOR(setTilt, REPLAY_SW, "Tilt (cabinet)");
+		SENSOR(hole, HOLE_SW, "Hole");
 		// constructor
 		StdSw(Sys80b* sys) : _sys(sys) {
 			//Serial.println("StdSw init...");
 			//delay(100);
 		};
 	};
-	StdSw stdSw = StdSw(this);
+	StdSw swStd = StdSw(this);
 
 #define ACTUATOR(name, type, n, descr) Sys80b_Actuator name = Sys80b_Actuator(_sys, type, n, F(descr))
 	class StdAct {
@@ -99,15 +111,15 @@ public:
 		ACTUATOR(holeKicker, SOLENOIDS, HOLE_SOL, "hole");
 		ACTUATOR(knocker, SOLENOIDS, KNOCKER_SOL, "knocker");
 		ACTUATOR(outhole, SOLENOIDS, OUTHOLE_SOL, "outhole");
-		ACTUATOR(relay_Q, LAMPS, Q_LAMP, "Q relay");
-		ACTUATOR(relay_T, LAMPS, T_LAMP, "T relay");
+		ACTUATOR(relay_Q, LAMPS, Q_RELAY_LAMP, "Q relay");
+		ACTUATOR(relay_T, LAMPS, T_RELAY_LAMP, "T relay");
 		// constructor
 		StdAct(Sys80b* sys) : _sys(sys) {
 			//Serial.println("StdAct init...");
 			//delay(100);
 		};
 	};
-	StdAct stdAct = StdAct(this);
+	StdAct actStd = StdAct(this);
 
 protected:
 	//Sys80b _sys;
@@ -118,43 +130,47 @@ protected:
 	//LightSet* _activeLightSet;
 	String _gameName;
 	uint16_t _gameNum;
-	pinballMode _mode;
+	PinballMode _mode;
 	bool _gameOver; // no players on game
 	byte _players; // 1..MAX_PLAYER
 	bool _3balls;
 	//String inits;
+	String _scoreStr;
 
 public:
 	PinGame(Board_Sys80b& board);
 	virtual ~PinGame();
-
 	void reset();
 	virtual void begin() {};
 	inline bool gameIsOver() { return _gameOver; }
-	void startNewGame();
-	bool addPlayer();
-	void setPinballMode(pinballMode mode);
-	void displayCurrentScore();
+	bool addNewPlayer();
+	bool switchToNextPlayer();
+	virtual void onPlayerChange(byte n) {};
+	virtual void initPlayer(byte n);
+	void hole();
+	void setTilt(bool st);
+	void setPinballMode(PinballMode mode);
+	//void displayCurrentScore();
 	void displayCredits();
+	void displayScore(byte player, bool blink);
 	void displayScoresAndCredits();
 	String getScoreStr(uint32_t scr, byte digits, bool leadingZeros = false, bool dots = false);
 	//void onButtonPressed(byte bt);
 	void loadHighScores();
 	void loadAwardScoreLevels();
 	void loadCoinsPerCredits();
-	void onCoinInserted(byte cch);
 	//uint16_t incrementPowerOnCounter();
 	void addCredits(byte increment);
 	//void incrementPlayers();
 	void addExtraBall();
 	void addScore(uint32_t sc);
 	void addBonus(uint32_t sc);
-	void setActivePlayer(byte nextPlayer);
+	//void setActivePlayer(byte nextPlayer);
 	//void updateLights(uint32_t ms);
 	//void setDelayedCall(func_t sub, uint32_t dlay);
 	//void setPeriodicCall(func_t sub, uint32_t _period);
 	//void switchModeStep(byte stp);
-	byte getNextPlayerOn();
+	//byte getNextPlayerOn();
 	String getTopPlayerString(byte playerNum);
 	//void onPRBButtonPressed(Sys80bIO::buttonID bt);
 	//void setDefaultLightSet();
@@ -183,20 +199,23 @@ public:
 		return LightGroup::activeLightSet->getLight(n)->isActive();
 	}
 	inline void switchOffAllLights() { LightGroup::activeLightSet->switchOffAllLights(); }
-	inline void tilt() { /* TODO.. */ }
-	inline void onSlamSwitchEvent(bool active) { if (active) tilt();	}
-	inline void onTestButtonPressed() { if (_gameOver) setPinballMode(TEST_MODE); }
-	//void renderNextLampsGroup();
-	//void updateLights(uint32_t ms);
-	//void updateAndRenderLamps(uint32_t ms);
-	//void onSwitchEvent(byte sw, bool st);
+	//inline void setTilt() { /* TODO.. */ }
+	inline void onSlamSwitchEvent(bool active) { if (active && !_gameOver) onTilt(); }
+	virtual void onPinballModeChange(PinballMode mode) {};
+	virtual void onKeyPressed(UserKey key);
+	virtual void onSwitchClosed(byte sw);
+	virtual void onCoinInserted(byte cch);
+	virtual void onTilt() {}
+	virtual void onHole() {};
+	virtual void onGameOver(byte n) {};
+	virtual void onGameStart() {};
 	virtual void millisRoutine(uint32_t& ms);
 	inline String getGameName() { return _gameName; } // returns game name
 	inline int getGameNumber() { return _gameNum; } //  returns Gottileb game id number
 	virtual void timerRoutine(int taskIdentifer, uint32_t& tm) {}
 
 protected:
-	void _initPlayer(byte n);
+	void _checkPressedKey(uint32_t& ms);
 };
 
 

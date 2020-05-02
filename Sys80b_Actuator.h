@@ -20,7 +20,7 @@ public:
 	bool state();
 	void set(bool state);
 	void activate(uint16_t actPeriod = 0, uint16_t swDelay = 0);
-	byte getNumber();
+	byte Number();
 	String getDescription();
 };
 

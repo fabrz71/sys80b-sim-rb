@@ -65,6 +65,9 @@ public:
 	inline void setText(byte row, String text, bool clearBefore = false) {
 		setText(row, 0, text.c_str(), clearBefore);
 	}
+	inline void setText(byte row, __FlashStringHelper* text, bool clearBefore = false) {
+		setText(row, 0, (const char*)text, clearBefore);
+	}
 	inline void setText(byte row, String srcText, short offset, bool clearBefore = false) {
 		setText(row, srcText.c_str(), offset, clearBefore);
 	}

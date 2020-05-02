@@ -51,7 +51,7 @@ byte SwitchGrid8x8::incrementStrobe() {
 		//lastRowChanged = r;
 		lastRowChanges = diff;
 		// checks which switch has changed
-		bv = 1; // bit value
+		bv = 1; // test bit value
 		for (b = 0; b < 8; b++) { // for each bit...
 			if (diff & bv) { // bit has changed!
 				swChangeCount[r][b]++;

@@ -22,31 +22,59 @@ BigHouse::BigHouse(Board_Sys80b& board) : PinGame(board) {
 	slamSwitchNormalState = false;
 	//msg->outln(F("- light groups init..."));
 	//delay(100);
-	extraball_ls = new LightGroup("extraball", 5, 6, 7, -1);
-	lastchance_ls = new LightGroup("lastchance", 8, 9, -1);
-	special_ls = new LightGroup("special", 10, 11, -1);
-	wall_ls = new LightGroup("wall", 22, 23, 24, 25, -1);
-	break_ls = new LightGroup("break", 29, 30, 31, 32, 33, -1);
-	jail_ls = new LightGroup("jail", 34, 35, 36, 37, -1);
-	multi_ls = new LightGroup("multi", 38, 39, 40, 41, -1);
-	cellblock_ls = new LightGroup("cellblock", 42, 43, 44, 45, -1);
-	lightshow_ls = new LightGroup("lightshow", 17, 46, -1);
-	droptarget_ls = new LightGroup("droptarget", 26, 27, 28, -1);
-	show1_ls = new LightGroup("show1", 26, 27, 28, 21, -1);
-	show2_ls = new LightGroup("show2", 8, 10, 11, 9, -1);
-	show3_ls = new LightGroup("show3", 15, 20, 44, 45, -1);
-	show4_ls = new LightGroup("show4", 29, 30, 31, 32, -1);
-	show5_ls = new LightGroup("show5", 5, 6, 7, 43, -1);
-	show6_ls = new LightGroup("show6", 3, 17, 42, 33, -1);
-	lShow_set[0] = jail_ls;
-	lShow_set[1] = wall_ls;
-	lShow_set[2] = show1_ls;
-	lShow_set[3] = show2_ls;
-	lShow_set[4] = show3_ls;
-	lShow_set[5] = show4_ls;
-	lShow_set[6] = show5_ls;
-	lShow_set[7] = show6_ls;
-	//lShow_set[8] = { jail_ls, wall_ls, show1_ls, show2_ls, show3_ls , show4_ls , show5_ls , show6_ls };
+	class LGroups {
+	public:
+		LightGroup* extraBall = new LightGroup("extraball", 5, 6, 7, -1);
+		LightGroup* lastChance = new LightGroup("lastchance", 8, 9, -1);
+		LightGroup* special = new LightGroup("special", 10, 11, -1);
+		LightGroup* wall = new LightGroup("wall", 22, 23, 24, 25, -1);
+		LightGroup* break_ = new LightGroup("break", 29, 30, 31, 32, 33, -1);
+		LightGroup* jail = new LightGroup("jail", 34, 35, 36, 37, -1);
+		LightGroup* multi = new LightGroup("multi", 38, 39, 40, 41, -1);
+		LightGroup* cellBlock = new LightGroup("cellblock", 42, 43, 44, 45, -1);
+		LightGroup* lightShow = new LightGroup("lightshow", 17, 46, -1);
+		LightGroup* dropTarget = new LightGroup("droptarget", 26, 27, 28, -1);
+		//LightGroup* show1 = new LightGroup("show1", 26, 27, 28, 21, -1);
+		//LightGroup* show2 = new LightGroup("show2", 8, 10, 11, 9, -1);
+		//LightGroup* show3 = new LightGroup("show3", 15, 20, 44, 45, -1);
+		//LightGroup* show4 = new LightGroup("show4", 29, 30, 31, 32, -1);
+		//LightGroup* show5 = new LightGroup("show5", 5, 6, 7, 43, -1);
+		//LightGroup* show6 = new LightGroup("show6", 3, 17, 42, 33, -1);
+	};
+	LGroups lGroup;
+	//extraball_ls = new LightGroup("extraball", 5, 6, 7, -1);
+	//lastchance_ls = new LightGroup("lastchance", 8, 9, -1);
+	//special_ls = new LightGroup("special", 10, 11, -1);
+	//wall_ls = new LightGroup("wall", 22, 23, 24, 25, -1);
+	//break_ls = new LightGroup("break", 29, 30, 31, 32, 33, -1);
+	//jail_ls = new LightGroup("jail", 34, 35, 36, 37, -1);
+	//multi_ls = new LightGroup("multi", 38, 39, 40, 41, -1);
+	//cellblock_ls = new LightGroup("cellblock", 42, 43, 44, 45, -1);
+	//lightshow_ls = new LightGroup("lightshow", 17, 46, -1);
+	//droptarget_ls = new LightGroup("droptarget", 26, 27, 28, -1);
+	//show1_ls = new LightGroup("show1", 26, 27, 28, 21, -1);
+	//show2_ls = new LightGroup("show2", 8, 10, 11, 9, -1);
+	//show3_ls = new LightGroup("show3", 15, 20, 44, 45, -1);
+	//show4_ls = new LightGroup("show4", 29, 30, 31, 32, -1);
+	//show5_ls = new LightGroup("show5", 5, 6, 7, 43, -1);
+	//show6_ls = new LightGroup("show6", 3, 17, 42, 33, -1);
+	//lShow_set[0] = jail_ls;
+	//lShow_set[1] = wall_ls;
+	//lShow_set[2] = show1_ls;
+	//lShow_set[3] = show2_ls;
+	//lShow_set[4] = show3_ls;
+	//lShow_set[5] = show4_ls;
+	//lShow_set[6] = show5_ls;
+	//lShow_set[7] = show6_ls;
+	lShow_set[0] = lGroup.jail;
+	lShow_set[1] = lGroup.wall;
+	lShow_set[2] = new LightGroup("show1", 26, 27, 28, 21, -1);
+	lShow_set[3] = new LightGroup("show2", 8, 10, 11, 9, -1);
+	lShow_set[4] = new LightGroup("show3", 15, 20, 44, 45, -1);
+	lShow_set[5] = new LightGroup("show4", 29, 30, 31, 32, -1);
+	lShow_set[6] = new LightGroup("show5", 5, 6, 7, 43, -1);
+	lShow_set[7] = new LightGroup("show6", 3, 17, 42, 33, -1);
+	//lShow_set[] = { jail_ls, wall_ls, show1_ls, show2_ls, show3_ls , show4_ls , show5_ls , show6_ls };
 	//for (int i = 0; i < 8; i++) {
 	//	Serial.print("Light Show group: ");
 	//	Serial.println(lShow_set[i]->nameStr);
@@ -54,12 +82,9 @@ BigHouse::BigHouse(Board_Sys80b& board) : PinGame(board) {
 	//msg->outln(F("- timers init..."));
 	dropt_tmr = new TimerTask(this, DROPT_LIGHT_TMR1, "Drop targets", false);
 	lshow_tmr = new TimerTask(this, 200, "Light show", true);
-	brel_tmr = new TimerTask(this, SOL_DEF_TIME, "Ball release", false);
-	brel_tmr->setPeriodic(false);
 	dshow_tmr = new TimerTask(this, 1000, "Display show", false);
 	dropTargets_tt = tmr.add(dropt_tmr);
 	lightShow_tt = tmr.add(lshow_tmr);
-	ballRelease_tt = tmr.add(brel_tmr);
 	display_tt = tmr.add(dshow_tmr);
 }
 
@@ -85,7 +110,7 @@ BigHouse::~BigHouse() {
 
 void BigHouse::begin() {
 	msg->outln(F("BigHouse begin..."));
-	PinGame::reset();
+	reset();
 	lamps->setProtection(SND16_LMP, true);
 	lamps->setProtection(RAMP_LMP, true);
 	lamps->setProtection(BALLGATE_LMP, true);
@@ -93,25 +118,57 @@ void BigHouse::begin() {
 	setSound(SND_SHUT_UP);
 	//msg->outln(F("bank reset..."));
 	act.bankReset.activate(250);
-	msg->outln(F("starting shows..."));
-	startLightShow();
-	startDisplayShow();
+	//msg->outln(F("starting shows..."));
+	setPinballMode(SHOW_MODE);
+	//startLightShow();
+	//startDisplayShow();
 }
 
-void BigHouse::startNewGame() {
-	//startNewGame();
-	setPinballMode(GAME_MODE);
-	multiballMode = false;
-	bonusAdvanceSwitches = 100;
-	cellBlockSeq = 0;
-	multiSeq = 0;
-	extraBallGiven = false;
-	setSound(SND_MUSIC);
-	resetDropTargets();
-	resetCapturedBalls();
-	liftRamp(false);
-	openGate(true);
+void BigHouse::onPinballModeChange(PinballMode m) {
+	switch (m) {
+	case SHOW_MODE:
+		startLightShow();
+		startDisplayShow();
+		break;
+	case GAME_MODE:
+		multiballMode = false;
+		bonusAdvanceSwitches = 100;
+		cellBlockSeq = 0;
+		multiSeq = 0;
+		extraBallGiven = false;
+		setSound(SND_MUSIC);
+		resetDropTargets();
+		resetCapturedBalls();
+		liftRamp(false);
+		openGate(true);
+		switchAuger(false);
+		// TODO...
+		break;
+	case TEST_MODE:
+		//initMenu();
+		// TODO...
+		break;
+	case BOOKKEEP_MODE:
+		// TODO...
+		break;
+	}
 }
+
+//void BigHouse::initGame() {
+//	PinGame::initGame();
+//	setPinballMode(GAME_MODE);
+//	multiballMode = false;
+//	bonusAdvanceSwitches = 100;
+//	cellBlockSeq = 0;
+//	multiSeq = 0;
+//	extraBallGiven = false;
+//	setSound(SND_MUSIC);
+//	resetDropTargets();
+//	resetCapturedBalls();
+//	liftRamp(false);
+//	openGate(true);
+//	switchAuger(false);
+//}
 
 //bool BigHouse::isSpecialLamp(byte lamp) {
 //	if (lamp > 47) return false;
@@ -121,49 +178,51 @@ void BigHouse::startNewGame() {
 //}
 
 // EVENT DISPATCHER ROUTINE
-// sw = 0..63
+// swtch = 0..63
 // called whenever a switch opens or closes.
 // handles table events depending on pinball mode
-void BigHouse::onSwitchEvent(byte sw, bool st) {
-	sw = (sw >> 3) * 10 + (sw & 7); // format conversion
+void BigHouse::onSwitchClosed(byte swtch) {
+	//swtch = (swtch >> 3) * 10 + (swtch & 7); // format conversion
+	PinGame::onSwitchClosed(swtch);
 	switch (_mode) {
 	case SHOW_MODE:
-		if (sw == REPLAY_SW && st && credits > 0) {
+		if (swtch == REPLAY_SW && credits > 0) {
 			credits--;
 			setPinballMode(GAME_MODE);
 		}
 		// ..
 		break;
 	case GAME_MODE:
+		if (tiltState && swtch == sw.holeThrough.Number()) {
+			setTilt(false);
+			act.ballGate.set(false);
+			act.auger.set(false);
+			return;
+		}
 		if (swCount >= bonusAdvanceSwitches) {
 			swCount -= bonusAdvanceSwitches;
 			advanceMultiplier();
 		}
-		switch (sw) {
-			DISPATCH1(onBallOnChain(), 26);
-			DISPATCH1(onLeftRollover(), 30);
-			DISPATCH5(onBreakTarget((sw - 31) / 10), 31, 41, 51, 61, 71); // 0, 1, 2, 3, 4
-			DISPATCH1(onRubber(), 32);
+		switch (swtch) {
+			DISPATCH(onBallOnChain(), 26);
+			DISPATCH(onLeftRollover(), 30);
+			DISPATCH5(onBreakTarget((swtch - 31) / 10), 31, 41, 51, 61, 71); // 0, 1, 2, 3, 4
+			DISPATCH(onRubber(), 32);
 			DISPATCH3(onPopBumper(), 33, 43, 53);
-			DISPATCH2(onCellTarget((sw - 34) / 10), 34, 44); // 0, 1
-			DISPATCH2(onCellTarget((sw - 43) / 10), 63, 73); // 2, 3
-			DISPATCH4(onDropTarget((sw - 40) / 10), 40, 50, 60, 70); // side targets 0, 1, 2, 3
-			DISPATCH4(onJailTarget((sw - 42) / 10), 42, 52, 62, 72); // 0, 1, 2, 3
-			DISPATCH2(onOutRollover((sw == 45) ? 0 : 1), 45, 75);
-			DISPATCH1(onLeftKicker(), 46);
-			DISPATCH3(onTopRollover((sw - 54) / 10), 54, 64, 74); // 0, 1, 2
-			DISPATCH2(onReturnRollover((sw == 55) ? 0 : 1), 55, 65); //0, 1
-			DISPATCH1(onRightKicker(), 56);
-			DISPATCH1(tilt(), 57);
-			DISPATCH1(onOutHole(), 66);
-			DISPATCH1(onTopHole(), 76);
+			DISPATCH2(onCellTarget((swtch - 34) / 10), 34, 44); // 0, 1
+			DISPATCH2(onCellTarget((swtch - 43) / 10), 63, 73); // 2, 3
+			DISPATCH4(onDropTarget((swtch - 40) / 10), 40, 50, 60, 70); // side targets 0, 1, 2, 3
+			DISPATCH4(onJailTarget((swtch - 42) / 10), 42, 52, 62, 72); // 0, 1, 2, 3
+			DISPATCH2(onOutRollover((swtch == 45) ? 0 : 1), 45, 75);
+			DISPATCH(onLeftKicker(), 46);
+			DISPATCH3(onTopRollover((swtch - 54) / 10), 54, 64, 74); // 0, 1, 2
+			DISPATCH2(onReturnRollover((swtch == 55) ? 0 : 1), 55, 65); //0, 1
+			DISPATCH(onRightKicker(), 56);
+			DISPATCH(onTopHole(), 76);
 		}
 		break;
 	case TEST_MODE:
-		if (!st) break;
-		//if (sw == LEFTADV_SW) execMenuCmd(MENU_BACK);
-		//else if (sw == RIGHTADV_SW) execMenuCmd(MENU_NEXT);
-		//else if (sw == REPLAY_SW) execMenuCmd(MENU_ENTER);
+		// TODO...
 		break;
 	case BOOKKEEP_MODE:
 		// TODO...
@@ -171,9 +230,9 @@ void BigHouse::onSwitchEvent(byte sw, bool st) {
 	}
 }
 
-void BigHouse::onButtonPressed(UserKey butt) {
-	// TODO
-}
+//void BigHouse::onKeyPressed(UserKey butt) {
+//	PinGame::onKeyPressed(butt);
+//}
 
 void BigHouse::resetCapturedBalls() {
 	for (byte i = 0; i<3; i++) ballTrap[i] = false;
@@ -244,11 +303,6 @@ void BigHouse::awardExtraBall() {
 	// .. soundBuffer
 }
 
-void BigHouse::onBallInHole() {
-	//awardBonus();
-	//..
-}
-
 inline String BigHouse::getGameName() {
 	return String(GAME_NAME);
 }
@@ -257,11 +311,22 @@ inline int BigHouse::getGameNumber() {
 	return GAME_NUMBER;
 }
 
+//void BigHouse::setSound(byte snd) {
+//	sound16((snd & 0x10) == 0); // sound16 signal update (active low)
+//	'renderLamp(SND16_LMP); // immediate lamp update
+//	Serial.printf("%d: sound16: %d\n", millis(), (snd & 0x10) ? 0 : 1);
+//	Sys80b::setSound(snd);
+//}
+
+void BigHouse::setSnd16(bool s) {
+	setLamp(SND16_LMP, s); 
+	renderLamp(SND16_LMP);
+}
+
 bool BigHouse::releaseBall() {
 	bool ballReady = sw.outHole.isClosed();
 	//if (ballReady) _activeLightSet->getLight(BALLRELEASE_LMP)->pulse(500); // ball release
-	if (ballReady) act.ballRelease.set(true);
-	brel_tmr->enable();
+	if (ballReady) act.ballRelease.activate(1000);
 	return ballReady;
 }
 
@@ -288,10 +353,10 @@ void BigHouse::timerRoutine(int taskId, uint32_t& ms) {
 	msg->warn(F("unknown taskId"), CLASSNAME, "timerRoutine");
 }
 
-void BigHouse::millisRoutine(uint32_t& ms) {
-	snd16Update(ms); // "Sound16" bit preliminary update
-	PinGame::millisRoutine(ms);
-}
+//void BigHouse::millisRoutine(uint32_t& ms) {
+//	snd16Update(ms); // "Sound16" bit preliminary update
+//	PinGame::millisRoutine(ms);
+//}
 
 // GAME RULES ======================================================================
 
@@ -463,7 +528,7 @@ void BigHouse::onBallOnChain() {
 	//switches += 4;
 }
 
-void BigHouse::onOutHole() {
+void BigHouse::onHole() {
 	//if (modeStep == 0) {
 	//	modeStep = GAME_NEWBALL;
 	//	switchAuger(OFF);
@@ -472,6 +537,17 @@ void BigHouse::onOutHole() {
 	//else if (modeStep == GAME_TILT) switchModeStep(GAME_NEWBALL);
 
 	// ..TODO
+}
+
+void BigHouse::onTilt() {
+	if (sw.holeThrough.isOpen()) { // missing balls in hole
+		if (sw.leftShooter.isClosed()) {
+			act.ballGate.set(true);
+			act.leftShooter.activate(250, 500);
+		}
+		act.auger.set(true); // auger
+	}
+	if (sw.topHole.isClosed()) act.holeKicker.activate(250);
 }
 
 // ================================================================================
@@ -515,6 +591,7 @@ void BigHouse::switchToNextLightShow() {
 	case 0: // original light show
 	case 2:
 	case 4:
+		Serial.println("Original lightshow");
 		for (byte i = 0; i < 8; i++) {
 			//lShow_set[i]->setAll(OFF_L);
 			lShow_set[i]->set(0, ON_L);
@@ -523,20 +600,25 @@ void BigHouse::switchToNextLightShow() {
 		lightShowOrder = false;
 		break;
 	case 1: // linear on -> linear off
+		Serial.println("Linear lightshow");
 		lightShowDelay = 15; // ms
 		break;
 	case 3: // groups flashing
+		Serial.println("Groups flash lightshow");
 		lightShowDelay = 100;
 		break;
 	case 5: // random on -> random off
+		Serial.println("random lightshow");
 		lightShowDelay = 20;
 		lightShowOrder = true;
 		break;
 	case 6: // PCM
+		Serial.println("PCM lightshow");
 		lightShowOrder = true;
 		lightShowArg = 1;
 		break;
 	case 7: // light wave
+		Serial.println("Wave lightshow");
 		lightShowDelay = 20;
 	}
 	lightShowStep = 0;
@@ -545,7 +627,6 @@ void BigHouse::switchToNextLightShow() {
 
 void BigHouse::lightShowCycle(uint32_t &ms) {
 	byte i;
-	static uint16_t t = 1u;
 
 	switch (lightShowType) {
 	case 0: // original light show
@@ -562,7 +643,7 @@ void BigHouse::lightShowCycle(uint32_t &ms) {
 	case 1:
 		if (lightShowStep < 48) invertLight(lightShowStep);
 		else invertLight(lightShowStep - 48);
-		if (lightShowStep >= 96) switchToNextLightShow();
+		if (lightShowStep >= 95) switchToNextLightShow();
 		break;
 	case 3:
 		i = lightShowStep & 0x07; // i = 0..7
@@ -605,7 +686,7 @@ void BigHouse::lightShowCycle(uint32_t &ms) {
 }
 
 String BigHouse::getTopScoreStr(byte n) {
-	String st = " <" + String(n) + "> ";
+	String st = " (" + String(n) + ") ";
 	st += topScore[n].playerName + "- ";
 	st += topScore[n].scoreString + "  ";
 	return st;
@@ -634,6 +715,8 @@ void BigHouse::displayShowCycle(uint32_t& ms) {
 		dshow_tmr->setPeriod(2500u);
 	}
 	else if (displayShowStep >= 4) {
+		if (displayShowStep == 4) 
+			extDisplay->setDynamicFX(0, F("*ARTISTI DELLA FUGA*"), DFX_type::RIGHT_INS);
 		String st = getTopScoreStr(displayShowStep - 4);
 		extDisplay->setDynamicFX(1, st , DFX_type::LEFT_INS);
 		if (displayShowStep == 3 + TOP_SCORES) {
@@ -644,15 +727,19 @@ void BigHouse::displayShowCycle(uint32_t& ms) {
 	displayShowStep++;
 }
 
-void BigHouse::snd16Update(uint32_t& ms) {
-	if (!soundBuffer.isEmpty()) { // set S16 before S1-2-4-8
-		uint16_t snd = soundBuffer.peek();
-		// light #4 sound16 update
-		setLamp(SND16_LMP, (snd & 0x10) > 0, true);
-		renderLamp(SND16_LMP); // immediate update
-	}
-	else if (_soundPendingCmd) { // reset S16 before S1-2-4-8
-		setLamp(SND16_LMP, false, true);
-		renderLamp(SND16_LMP); // immediate update
-	}
-}
+//void BigHouse::snd16Update(uint32_t& ms) {
+//	//if (!soundBuffer.isEmpty()) { // set S16 before S1-2-4-8
+//	//	uint16_t snd = soundBuffer.peek();
+//	//	// light #4 sound16 update (active low)
+//	//	setLamp(SND16_LMP, (snd & 0x10) == 0, true);
+//	//	Serial.printf("%d: sound16: %d\n", millis(), ((snd & 0x10) == 0) ? 1 : 0);
+//	//	renderLamp(SND16_LMP); // immediate update
+//	//}
+//
+//	if (_soundPendingCmd && !_soundValueOut) { // set S16 before S1-2-4-8
+//		uint16_t snd = soundBuffer.peek();
+//		setLamp(SND16_LMP, (snd & 0x10) == 0, true); // light #4 sound16 update (active low)
+//		Serial.printf("%d: sound16: %d\n", millis(), ((snd & 0x10) == 0) ? 1 : 0);
+//		renderLamp(SND16_LMP); // immediate update
+//	}
+//}

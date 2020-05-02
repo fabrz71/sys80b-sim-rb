@@ -12,6 +12,9 @@ Sys80b::Sys80b(Board_Sys80b& board) {
 	lamps = new BitMappedSet(LAMPS_COUNT);
 	slamSwitchNormalState = true;
 	slamSwitchLastState = slamSwitchNormalState;
+	//_soundValueOut = false;
+	_soundOutTime = 0;
+	_soundOutputStage = 0;
 	//hw = nullptr;
 	//reset();
 }
@@ -30,6 +33,7 @@ void Sys80b::reset() {
 	lamps->reset();
 	solenoids->resetAll();
 	soundBuffer.Clear();
+	setSound(15); // shout
 	currentLampGroup = 0;
 	display.reset();
 	_soundPendingCmd = false;
@@ -37,7 +41,7 @@ void Sys80b::reset() {
 	slamSwitchLastState = slamSwitchNormalState;
 }
 
-byte Sys80b::getBallsCount() {
+byte Sys80b::getBallsPerPlayCount() {
 	return (hw->getSettingSwitch(25) == 1) ? 3 : 5;
 	//return 3; // TODO
 }
@@ -68,9 +72,14 @@ void Sys80b::setSolenoid(byte n, bool active) {
 	if (solenoids->update(t)) hw->writeSolenoids(solenoids->getStates());
 }
 
-// snd = 0..31
- void Sys80b::setSound(byte snd) {
-	//soundBuffer.sendCmd(snd);
+ void Sys80b::setLampImmediate(byte n, bool state, bool forceProtection) {
+	 setLamp(n, state, forceProtection);
+	 renderLamp(n);
+	 currentLampGroup = n >> 2;
+ }
+
+ // snd = 0..31
+void Sys80b::setSound(byte snd) {
 	soundBuffer.put(snd);
 	_soundPendingCmd = true;
 }
@@ -102,19 +111,20 @@ void Sys80b::feedDisplay() {
 	uint16_t dd; // display control + data
 	byte dc; // display control code: 1 = row 1; 2 = row 2; 3 = both rows
 	byte db; // display data (8-bit);
+	uint16_t LD_time = 25; // us
 
 	for (int i = 0; i < 2; i++) { // 1 iteration only in case dc == 3
 		dd = display.getNextDisplayData();
 		dc = (byte)((dd & 0x300) >> 8);
 		db = (byte)(dd & 0xff);
 		hw->writeDisplayData(db); // updates 8-bit data bus
-		if (dc & 1u) hw->writeDisplayLD1(HIGH); // LD on
-		if (dc & 2u) hw->writeDisplayLD2(HIGH);
-		delayMicroseconds(11);
-		if (dc & 1u) hw->writeDisplayLD1(LOW); // LD off
+		if (dc & 1u) hw->writeDisplayLD1(LOW); // LD on
 		if (dc & 2u) hw->writeDisplayLD2(LOW);
+		delayMicroseconds(LD_time);
+		if (dc & 1u) hw->writeDisplayLD1(HIGH); // LD off
+		if (dc & 2u) hw->writeDisplayLD2(HIGH);
 		if (dc == 3u) break; // CMD for both rows has already been sent
-		if (i == 0) delayMicroseconds(100); // only after first iteration
+		if (i == 0) delayMicroseconds(100u - LD_time); // only after first iteration
 	}
 
 }
@@ -134,7 +144,7 @@ bool Sys80b::renderNextLampsGroup() {
 		lamps->clearChanges4(currentLampGroup);
 		return true;
 	}
-	//clearLampsOutput();
+	hw->clearLampsOutput();
 	return false;
 }
 
@@ -149,22 +159,63 @@ bool Sys80b::renderLampsGroup(byte lg) {
 	return false;
 }
 
- void Sys80b::updateSound() {
-	 if (!_soundPendingCmd) return;
-	 byte s = soundBuffer.isEmpty() ? 0 : soundBuffer.get();
-	 hw->writeSound(~(s & 0x7f)); // only bits 0..6, not the 7th bit
-	 _soundPendingCmd = !(soundBuffer.isEmpty() && s == 0);
+// to call every 1 ms
+void Sys80b::updateSound(uint32_t& tm) {
+	static byte snd = 0; // only first 4 lower output bits (snd1, snd2, snd4, snd8)
+
+	//if (_soundOutTime > 0) { // sound output value already set
+	//	if (tm - _soundOutTime < SND_OUT_TIME) return; // introduces a delay before clearing output
+	//	setSnd16(false);
+	//	_soundOutTime = 0;
+	//	snd = 0; // clear sound output
+	//}
+	//else { // ready for new sound output
+	//	if (!_soundPendingCmd) return;
+	//	snd = soundBuffer.get();
+	//	_soundOutTime = tm;
+	//	setSnd16((snd & 16) > 0);
+	//	if (soundBuffer.isEmpty()) _soundPendingCmd = false;
+	//}
+	//hw->writeSound(~(snd & 0x7f)); // only bits 0..6, not the 7th bit
+	//Serial.printf("%d: writeSound(", millis());
+	//Serial.print((byte)(~(snd & 0x7f)), BIN);
+	//Serial.println(")");
+
+	switch (_soundOutputStage) {
+		case 0: // check for pending command
+			if (soundBuffer.isEmpty()) break; // no sound pending command
+			snd = soundBuffer.get();
+			break;
+		case 1: // snd16 output: 1 more cycle (1 ms)
+			setSnd16((snd & 16) > 0); // snd16 output
+			break;
+		case 2: // LSBs sound output (snd1, snd2, snd4, snd8)
+			hw->writeSound(~(snd & 0x7f)); // set sound LSBs
+			break;
+		case 3: // sound-out wait state 
+			if (tm - _soundOutTime < SND_OUT_TIME) return; // no stage auto-increment
+			if ((snd & 16) == 0) _soundOutputStage++; // avoid redundant snd16 reset
+			break;
+		case 4: // (optional) snd16 reset
+			setSnd16(false); // snd16 reset
+			break;
+		case 5: // reset LSBs
+			hw->writeSound(0x7f); // reset sound LSBs
+			break;
+	}
+	if (++_soundOutputStage > 5) _soundOutputStage = 0;
  }
 
-void Sys80b::updUserKeyState(UserKey key, uint32_t& ms) {
-	if (key != _keyPressed) {
+// declare a key state change
+// shoud always be called also after a key release with key = NO_KEY
+void Sys80b::setKeyPressed(UserKey key, uint32_t& ms) {
+	if (key != _keyPressed) { // key has changed
 		_keyPressed = key;
-		_keyStartTime = ms;
-		_keyRepeat = false;
-		if (key != NO_KEY) onButtonPressed(key);
+		_keyUpdateTime = ms;
 	}
 }
 
+// Low-level switches state change handler routine.
 void Sys80b::_onSwitchEvent(byte sw, bool st, uint32_t& ms) {
 	String str;
 
@@ -173,8 +224,8 @@ void Sys80b::_onSwitchEvent(byte sw, bool st, uint32_t& ms) {
 	str += (st ? " closed" : " opened");
 	msg->outln(str);
 
-	// user buttons
-	if (sw == LEFTADV_KEY || sw == RIGHTADV_KEY || sw == REPLAY_KEY) {
+	// user buttons pressed
+	if (sw == LEFTADV_SW || sw == RIGHTADV_SW || sw == REPLAY_SW || sw == TEST_SW) {
 		UserKey key;
 		switch (sw) {
 		case LEFTADV_SW:
@@ -189,42 +240,47 @@ void Sys80b::_onSwitchEvent(byte sw, bool st, uint32_t& ms) {
 			key = REPLAY_KEY;
 			str = "REPLAY";
 			break;
+		case TEST_SW:
+			key = TEST_KEY;
+			str = "TEST";
+			break;
 		default:
 			key = NO_KEY;
 			str = "<unknown>";
 		}
-		updUserKeyState(st ? key : NO_KEY, ms);
-		str = "Key " + str;
-		str += (st ? " pressed" : " released");
-		msg->outln(str);
+		if (st) {
+			str = "Key " + str + " pressed";
+			msg->outln(str);
+		}
+		else {
+			msg->outln(F("key released."));
+			key = NO_KEY;
+		}
+		setKeyPressed(key, ms);
 		return;
 	}
-
-	// TEST button
-	if (sw == TEST_SW) {
-		onTestButtonPressed();
-		return;
-	}
+	//onSwitchEvent(sw, st);
+	if (st) onSwitchClosed(sw); else onSwitchOpened(sw);
 }
 
-void Sys80b::_checkPressedKey(uint32_t& ms) {
-	if (_keyPressed != NO_KEY) {
-		if (!_keyRepeat) {
-			if (ms - _keyStartTime >= KEY_REPEAT_TIMER) {
-				_keyRepeat = true;
-				_keyStartTime = ms;
-				onButtonPressed(_keyPressed);
-			}
-		}
-		else { // repeating key
-			if (ms - _keyStartTime >= KEY_REPEAT_PERIOD) {
-				_keyStartTime = ms;
-				onButtonPressed(_keyPressed);
-			}
-		}
-	}
-	else _keyRepeat = false;
-}
+//// Checks for keys command, implementing hold&repeat feature and calling upper-level event handler
+//// onKeyPressed(..) function.
+//// Must be called at regular times, with period <= KEY_REPEAT_PERIOD
+//void Sys80b::_checkPressedKey(uint32_t& ms) {
+//	if (_keyPressed != NO_KEY) {
+//		if (!_keyRepeat) {
+//			if (ms - _keyUpdateTime >= KEY_REPEAT_DELAY) _keyRepeat = true;
+//		}
+//		else { // repeating key
+//			if (ms - _keyUpdateTime >= KEY_REPEAT_PERIOD) {
+//				//Serial.print("key repeating...");
+//				_keyUpdateTime = ms;
+//				onKeyPressed(_keyPressed);
+//			}
+//		}
+//	}
+//	//else _keyRepeat = false;
+//}
 
 // Periodic update and output routine, to be
 // called every millisecond.
@@ -235,7 +291,7 @@ void Sys80b::_checkPressedKey(uint32_t& ms) {
 void Sys80b::_millisRoutine(uint32_t& ms) {
 	
 	renderNextLampsGroup();
-	updateSound();
+	updateSound(ms); // may change a lamp - put it after renderNextLampsGroup()
 	checkSolenoids(ms);
 	feedDisplay();
 	// /* if (display.isLastPosition()) */ display.update(ms);
@@ -247,13 +303,13 @@ void Sys80b::_millisRoutine(uint32_t& ms) {
 	}
 
 	if (acquireReturns(ms)) { // any changes?
-		byte sw = switchGrid.getLastChangedSwitch();
+		byte sw = switchGrid.getLastChangedSwitch(); // surely sw != 0xff
 		bool st = switchGrid.getLastChangedSwitchState();
 		switchGrid.clearLastSwitchChanged();
 		_onSwitchEvent(sw, st, ms);
-		onSwitchEvent(sw, st); // virtual function: code provided by superclass
+		//onSwitchEvent(sw, st); // virtual function: code provided by superclass
 	}
 	incrementStrobe();
 
-	_checkPressedKey(ms);
+	//_checkPressedKey(ms);
 }

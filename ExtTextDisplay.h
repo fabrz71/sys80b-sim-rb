@@ -38,7 +38,7 @@ enum DFX_type { // Text-line Dynamic Effect identifier
 class ExtTextDisplay {
 public:
 	static const byte LINE_MAX_LEN = 100;
-	static const uint16_t STD_DFX_DELAY = 50;
+	static const uint16_t STD_DFX_DELAY = 30;
 	static const int DEF_BLINK_PERIOD = 500; // [ms]
 	static const int DEF_BLINK_DURATION = 0; // [ms]
 

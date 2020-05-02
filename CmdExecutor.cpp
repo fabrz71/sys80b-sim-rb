@@ -33,6 +33,10 @@ bool CmdExecutor::execCmd(String command) {
 	if (cmd == soundCmd) {
 		arg1 = _cmdPartStr[1].toInt() & 0x1f;
 		_sys->setSound(arg1);
+		if (_partsCount > 2) {
+			arg2 = _cmdPartStr[2].toInt() & 0x1f;
+			_sys->setSound(arg2);
+		}
 		ok = true;
 	}
 	if (cmd == solenoidCmd) {
@@ -59,8 +63,23 @@ bool CmdExecutor::execCmd(String command) {
 		else {
 			arg1 = _cmdPartStr[1].toInt();
 			arg2 = _cmdPartStr[2].toInt();
+			_sys->setLamp(arg1, arg2 > 0, true);
+		}
+		ok = true;
+	}
+	if (cmd == lightCmd) {
+		if (_cmdPartStr[1] == clrStr) _sys->switchOffAllLights();
+		else {
+			arg1 = _cmdPartStr[1].toInt();
+			arg2 = _cmdPartStr[2].toInt();
 			_sys->setLight(arg1, arg2 > 0);
 		}
+		ok = true;
+	}
+	if (cmd == blinklightCmd) {
+		arg1 = _cmdPartStr[1].toInt();
+		if (_partsCount >= 3) arg2 = _cmdPartStr[2].toInt(); else arg2 = 250u;
+		_sys->blinkLight(arg1, arg2);
 		ok = true;
 	}
 	if (cmd == pulselightCmd) {
@@ -100,6 +119,16 @@ bool CmdExecutor::execCmd(String command) {
 		}
 		ok = true;
 	}
+	if (cmd == displayCmd) {
+		if (_cmdPartStr[1] == clrStr) _sys->display.clear();
+		else {
+			arg1 = _cmdPartStr[1].toInt() & 1;
+			s = command.substring(_cmdPartIdx[2]);
+			_sys->display.setText(arg1, s);
+		}
+		ok = true;
+	}
+
 	if (cmd == factorysettingsCmd) {
 		_hw->restoreFactorySettings(true);
 		_hw->lcdclr();
@@ -138,24 +167,23 @@ bool CmdExecutor::execCmd(String command) {
 		ok = true;
 	}
 	if (cmd == helpCmd) {
+		static const char* str1 = " <number> [<number>]";
+		static const char* str2 = " clear | <number> <0|1>";
+		static const char* str3 = " clear | <row> <text>";
 		_hw->lcdclr();
 		_hw->lcdprn(0, F("See serial comm"));
 		_hw->lcdprn(1, F("for list of cmd."));
 		Serial.println(F("AVAILABLE COMMANDS:"));
-		Serial.print(soundCmd);
-		Serial.println(F(" <number>"));
-		Serial.println(solenoidCmd);
-		Serial.println(F(" clear | <number> <0|1>"));
-		Serial.print(pulsesolenoidCmd);
-		Serial.println(F(" <number> [<milliseconds>]"));
-		Serial.print(lampCmd);
-		Serial.println(F(" clear | <number> <0|1>"));
-		Serial.print(pulselightCmd);
-		Serial.println(F(" <number>"));
-		Serial.print(ledgridmodeCmd);
-		Serial.println(F(" lights | switches | off"));
-		Serial.print(lcdCmd);
-		Serial.println(F(" clear | <row> <text>"));
+		Serial.print(soundCmd);	Serial.println(str1);
+		Serial.print(solenoidCmd); Serial.println(str2);
+		Serial.print(pulsesolenoidCmd);	Serial.println(F(" <number> [<milliseconds>]"));
+		Serial.print(lampCmd); Serial.println(str2);
+		Serial.print(lightCmd);	Serial.println(str2);
+		Serial.print(blinklightCmd); Serial.println(F(" <number> [<period>]"));
+		Serial.print(pulselightCmd); Serial.println(F(" <number>"));
+		Serial.print(ledgridmodeCmd); Serial.println(F(" lights | switches | off"));
+		Serial.print(lcdCmd); Serial.println(str3);
+		Serial.print(displayCmd); Serial.println(str3);
 		Serial.print(factorysettingsCmd);
 		Serial.println(F(" : restore factory settings in NVRAM"));
 		Serial.print(freememCmd);
@@ -164,8 +192,7 @@ bool CmdExecutor::execCmd(String command) {
 		Serial.println(F(" : show board revision"));
 		Serial.print(pocCmd);
 		Serial.println(F(" [clear] : [clear and] show power-on counter"));
-		Serial.print(resetCmd);
-		Serial.println(F(" : reset system 80/B"));
+		Serial.print(resetCmd);	Serial.println(F(" : reset system 80/B"));
 		Serial.println(helpCmd);
 		Serial.println();
 		ok = true;
@@ -184,6 +211,7 @@ void CmdExecutor::_getParts(String& cmd) {
 	i1 = 0;
 	
 	//firstArgIdx = 0;
+	_partsCount = 0;
 	len = cmd.length();
 	if (len == 0) return;
 	//for (i0 = 0; i0 < len; i0++) if (cmd.charAt(i0) < 32) cmd.setCharAt(i0, 32);

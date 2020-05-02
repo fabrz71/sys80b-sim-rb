@@ -31,6 +31,9 @@ public:
 	const char *GAME_NAME = "Big House";
 	//const byte SND16_LMP = 4;
 
+	// special lamps: not just real lamps but solenoids
+	enum SpecialLamp { SND16_LMP = 4, RAMP_LMP = 12, BALLGATE_LMP = 13, AUGER_LMP = 14 };
+
 	bool multiballMode;
 	bool ballTrap[3]; // left, right, upper right, lower right
 	byte capturedBalls; // 0..3
@@ -50,11 +53,6 @@ public:
 	TimerTask* dropt_tmr, * lshow_tmr, * brel_tmr, * dshow_tmr;
 	int dropTargets_tt, lightShow_tt, ballRelease_tt, display_tt;
 
-	// special lamps: not exactly real lamps but solenoids
-	//static const byte SPECIAL_LAMPS_COUNT = 8;
-	//const byte special_lamp[SPECIAL_LAMPS_COUNT] = { 0, 1, 2, 4, 12, 13, 14 };
-	enum SpecialLamp { SND16_LMP = 4, RAMP_LMP = 12, BALLGATE_LMP = 13, AUGER_LMP = 14 };
-
 	LightGroup *extraball_ls, *lastchance_ls, *special_ls, *wall_ls, *break_ls;
 	LightGroup *jail_ls, *multi_ls, *cellblock_ls, *lightshow_ls, *droptarget_ls;
 	LightGroup *show1_ls, *show2_ls, *show3_ls, *show4_ls, *show5_ls, *show6_ls;
@@ -64,7 +62,7 @@ public:
 	// lamps description
 	const String lightInfo[LAMPS_COUNT] = {
 		F("_Relay 'Q'"),       // #0: not a lamp: GAME OVER 'Q' relay
-		F("_Relay 'T'"),       // #1: not a lamp: TILT 'T' relay
+		F("_Relay 'T'"),       // #1: not a lamp: LIGHTSHOW 'T' relay
 		F("_ball release"),    // #2: not a lamp: BALL RELEASE solenoid
 		F("Shoot Again"),     // #3
 		F("_Sound 16"),        // #4: not a lamp: SOUND16 signal
@@ -81,8 +79,8 @@ public:
 		F("Ramp 'lock'"),		// #15
 		F("center dome (#67)"), // #16
 		F("bottom left & right light show"), // #17
-		F("100,000x multiplier"),    // #18 glass top lights
-		F("Special"),                // #19 glass top lights
+		F("100,000x multiplier"),    // #18 (glass top)
+		F("Special"),                // #19 (glass top)
 		F("Right shooter 'escape'"), // #20
 		F("Left shooter 'lock'"),
 		F("Brick wall #4"),
@@ -112,11 +110,6 @@ public:
 		F("Top light show"),
 		F("Spot/Search light") // #47
 	};
-
-// specific special lamps
-#define liftRamp(v) setLamp(12, v)
-#define openGate(v) setLamp(13, v)
-#define switchAuger(v) setLamp(14, v)
 
 // solenoids description
 	 const String solInfo[SOLENOID_COUNT+1]  = {
@@ -184,7 +177,7 @@ public:
 #define NOSW (const char*)nullptr
 
 // switch matrix: inputs description
-	class Sw {
+	class Sw : public StdSw {
 	protected:
 		Sys80b* _sys;
 	public:
@@ -194,8 +187,8 @@ public:
 		SENSOR(kickRubbers, 32, "kicking rubbers");
 		SENSOR(topPopBumper, 33, "top pop bumper");
 		SENSOR(spotTarget1, 34, "cell block spot Target #1");
-		SENSOR(leftFlipper, 35, "left flipper");
-		SENSOR(rightFlipper, 36, "right flipper");
+		SENSOR(flippers, 35, "flippers");
+		SENSOR(holeThrough, 36, "out hole through");
 		SENSOR(dropTarget1, 40, "drop target #1");
 		SENSOR(break2, 41, "'BREAK' target #2");
 		SENSOR(jail1, 42, "'JAIL' target #1");
@@ -223,14 +216,15 @@ public:
 		SENSOR(spotTarget4, 73, "cell block spot Target #4");
 		SENSOR(topRollover3, 74, "top rollover #3");
 		SENSOR(rightOutside, 75, "right outside rollover");
-		SENSOR(hole, 76, "hole");
+		SENSOR(topHole, 76, "top hole");
 		// constructor
-		Sw(Sys80b* sys) : _sys(sys) {};
+		//Sw(Sys80b* sys) : _sys(sys) {};
+		Sw(Sys80b* sys) : StdSw(sys) {};
 	};
 	Sw sw = Sw(this);
 	
 	// specific actuators
-	class Act {
+	class Act : public StdAct {
 	protected:
 		Sys80b* _sys;
 	public:
@@ -245,7 +239,8 @@ public:
 		ACTUATOR(ballGate, LAMPS, 13, "ball gate");
 		ACTUATOR(auger, LAMPS, 14, "auger motor");
 		// constructor
-		Act(Sys80b* sys) : _sys(sys) {};
+		//Act(Sys80b* sys) : _sys(sys) {};
+		Act(Sys80b* sys) : StdAct(sys) {};
 	};
 	Act act = Act(this);
 
@@ -265,20 +260,22 @@ public:
 #define DROPT_LIGHT_TMR1 2000
 #define DROPT_LIGHT_TMR2 5000
 
-#define DISPATCH1(f,a) case a: f; break
-#define DISPATCH2(f,a,b) case a: case b: f; break
-#define DISPATCH3(f,a,b,c) case a: case b: case c: f; break
-#define DISPATCH4(f,a,b,c,d) case a: case b: case c: case d: f; break
-#define DISPATCH5(f,a,b,c,d,e) case a: case b: case c: case d: case e: f; break
+//#define DISPATCH1(f,a) case a: f; return
+#define DISPATCH2(f,a,b) case a: case b: f; return
+#define DISPATCH3(f,a,b,c) case a: case b: case c: f; return
+#define DISPATCH4(f,a,b,c,d) case a: case b: case c: case d: f; return
+#define DISPATCH5(f,a,b,c,d,e) case a: case b: case c: case d: case e: f; return
 
 	BigHouse(Board_Sys80b& board);
 	~BigHouse();
 
 	void begin();
-	void startNewGame();
+	//void setPinballMode(PinballMode m);
+	void onPinballModeChange(PinballMode mode);
+	//void initGame();
 	//bool isSpecialLamp(byte lamp);
-	void onSwitchEvent(byte sw, bool st);
-	void onButtonPressed(UserKey butt);
+	void onSwitchClosed(byte sw);
+	//void onKeyPressed(UserKey butt);
 	void resetCapturedBalls();
 	void resetJailBreak();
 	void resetDropTargets();
@@ -290,7 +287,6 @@ public:
 	void advanceBreak();
 	void advanceMultiplier();
 	void awardExtraBall();
-	void onBallInHole();
 	void onDropTarget(byte n);
 	void onBreakTarget(byte n);
 	void onJailTarget(byte n);
@@ -305,7 +301,8 @@ public:
 	void onPopBumper();
 	void onRubber();
 	void onBallOnChain();
-	void onOutHole();
+	void onHole();
+	void onTilt();
 	void dropTimerRoutine(uint32_t &ms);
 	void startLightShow();
 	void switchToNextLightShow();
@@ -319,9 +316,17 @@ public:
 	int getGameNumber();
 	String getTopScoreStr(byte n);
 	bool releaseBall();
-	void snd16Update(uint32_t& t);
+	//void setSound(byte n);
+	//void snd16Update(uint32_t& t);
 	void timerRoutine(int taskIdentifer, uint32_t& ms);
-	void millisRoutine(uint32_t& ms);
+	//void millisRoutine(uint32_t& ms);
+
+	// specific special lamps
+	//inline void sound16(bool en) { setLamp(SND16_LMP, en); renderLamp(SND16_LMP); }
+	void setSnd16(bool s);
+	inline void liftRamp(bool en) { setLamp(RAMP_LMP, en); }
+	inline void openGate(bool en) { setLamp(BALLGATE_LMP, en); }
+	inline void switchAuger(bool en) { setLamp(AUGER_LMP, en); }
 };
 
 #endif

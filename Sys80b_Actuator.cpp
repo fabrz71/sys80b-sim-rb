@@ -41,9 +41,10 @@ void Sys80b_Actuator::set(bool state) {
 
 void Sys80b_Actuator::activate(uint16_t actPeriod, uint16_t swDelay) {
 	if (_type == SOLENOIDS)	_sys->activateSolenoid(num, actPeriod, swDelay);
+	//else _sys->setLamp(num, true);
 }
 
-byte Sys80b_Actuator::getNumber() {
+byte Sys80b_Actuator::Number() {
 	return num;
 }
 
